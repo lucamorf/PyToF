@@ -15,8 +15,8 @@ from PyToF import ClassToF
 
 X = ClassToF.ToF()
 ```
-There is an extensive tutorial in $\texttt{PyToF\_Tutorial.ipynb}$ that explains everything.
+There is an extensive tutorial in PyToF_Tutorial.ipynb that explains all functionalities associated with this class.
 
 ## Accuracy and Convergence
-See the folder $\texttt{PyToF\_Accuracy\_and\_Convergence\_Images}$ for plots that demonstrate the accuracy of PyToF when compared against Wisdom & Hubbard 2016.
-The plots have been generated using $\texttt{PyToF\_Accuracy\_and\_Convergence.ipynb}$
+See the folder PyToF_Accuracy_and_Convergence_Images for plots that demonstrate the accuracy of PyToF when compared against Wisdom & Hubbard 2016.
+The plots have been generated using PyToF_Accuracy_and_Convergence.ipynb
