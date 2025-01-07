@@ -303,6 +303,8 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
 
     j = 0
 
+    save = opts['save']
+
     for i in idxs:
 
         if what_model == 'baro':
@@ -330,8 +332,6 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
 
                 j += 1
 
-        save = opts['save']
-
         if i == idxs[0] and len(idxs) == 1:
 
             opts['color'] = color; opts['save'] = save; opts['new_figure'] = True
@@ -353,7 +353,7 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
                 opts['sm'] = sm
 
             opts['color'] = color; opts['save'] = save; opts['new_figure'] = False
-
+        
         plot_xy(class_obj, x, y, **opts)
 
 def plot_state_corr_xy(class_obj, x, y, state, what_model, **kwargs):
