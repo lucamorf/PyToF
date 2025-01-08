@@ -7,7 +7,7 @@ Download or clone this repository, navigate into the directory and execute
 pip install .
 ```
 
-Note that the package requires numpy, scipy, matplotlib and emcee.
+Note that the package requires numpy, scipy, matplotlib, emcee and tqdm.
 
 ## Basic usage
 ```python
