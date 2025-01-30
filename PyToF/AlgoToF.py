@@ -334,13 +334,13 @@ def B9(fs, mean_l, rho, opts):
         for i in range(opts['order']+1):
 
                 I = scipy.integrate.cumulative_trapezoid(z**(2*i+3)*fs[i], x=rho/rho_bar, initial=0)
-                new_SS.append(rho/rho_bar*fs[i] - z**-(2*i+3)*I)
+                new_SS.append(np.nan_to_num(rho/rho_bar*fs[i] - z**-(2*i+3)*I))
 
         for i in range(opts['order']+1):
 
                 Ip = scipy.integrate.cumulative_trapezoid(z**(2-2*i)*fs[opts['order']+1+i], x=rho/rho_bar, initial=0)
                 Ip = Ip[N] - Ip
-                new_SS.append(-rho/rho_bar*fs[opts['order']+1+i] + z**-(2-2*i)*(rho[N]/rho_bar*(fs[opts['order']+1+i])[N] - Ip))
+                new_SS.append(np.nan_to_num(-rho/rho_bar*fs[opts['order']+1+i] + z**-(2-2*i)*(rho[N]/rho_bar*(fs[opts['order']+1+i])[N] - Ip)))
 
         return new_SS
 

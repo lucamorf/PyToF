@@ -292,6 +292,8 @@ def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize
 
         _pressurize(class_obj)
 
+    return out.it
+
 def relax_to_barotrope(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize=True):
 
     """
