@@ -440,4 +440,3 @@ def relax_to_density(class_obj, fixradius=True, fixmass=True, fixrot=True, press
         print(c.INFO + 'Relaxing to density done in ' + c.NUMB + '{:.2e}'.format(toc-tic) + c.INFO + ' seconds.' + c.ENDC)
 
     return it
-

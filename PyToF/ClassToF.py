@@ -106,7 +106,6 @@ class ToF:
         - dens_param_calc:  Possibly updated parameters used by the density function set via set_density_function()
         """
 
-
         self.li                 = np.linspace(1, 1/self.opts['N'], self.opts['N'])*self.opts['R_init']
         self.rhoi               = np.ones(self.opts['N'])*self.opts['M_init']/(4*np.pi/3*self.opts['R_init']**3)
         self.Pi                 = np.zeros(self.opts['N'])
