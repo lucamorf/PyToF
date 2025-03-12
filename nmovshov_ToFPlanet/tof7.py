@@ -7,7 +7,7 @@ import sys, os
 import json
 import numpy as np
 import warnings
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid as cumtrapz
 from scipy.interpolate import interp1d
 
 c7file = os.path.join(os.path.dirname(__file__),'tof7_coeffs.json')

@@ -348,7 +348,7 @@ def _Pn(n, x):
 
 def _mass_int(svec, dvec):
     """Trapz-integrate mass from rho(r) data."""
-    from scipy.integrate import trapz
+    from scipy.integrate import trapezoid as trapz
     return -4*np.pi*trapz(dvec*svec**2, x=svec)
 
 def _default_opts(kwargs):

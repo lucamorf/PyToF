@@ -191,7 +191,7 @@ def Pn(n, x):
 
 def mcumtrapz(X, Y):
     # Convert scipy.integrate.cumtrapz to MATLAB-style cumtrapz.
-    from scipy.integrate import cumtrapz
+    from scipy.integrate import cumulative_trapezoid as cumtrapz
     return cumtrapz(Y, X, initial=0)
 
 def B111(ss, SS):
