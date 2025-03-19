@@ -303,7 +303,7 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
 
     j = 0
 
-    save = opts['save']
+    save = opts['save']; plot_literature = opts['plot_literature']; legend = opts['legend']
 
     for i in idxs:
 
@@ -314,7 +314,7 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
         elif what_model == 'dens':
 
             costJs = class_obj.dens_cost_function(state[i,:], return_sum=False)
-
+            
         else:
 
             raise KeyError(c.WARN + 'Invalid keyword for what_model! Use \'baro\' or \'dens\'.' + c.ENDC)
@@ -334,15 +334,15 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
 
         if i == idxs[0] and len(idxs) == 1:
 
-            opts['color'] = color; opts['save'] = save; opts['new_figure'] = True
+            opts['color'] = color; opts['save'] = save; opts['new_figure'] = True; opts['plot_literature'] = plot_literature; opts['legend'] = legend
 
         elif i == idxs[0]:
 
-            opts['color'] = color; opts['save'] = False; opts['new_figure'] = True
+            opts['color'] = color; opts['save'] = False; opts['new_figure'] = True; opts['plot_literature'] = False; opts['legend'] = False
 
         elif i != idxs[-1]:
 
-            opts['color'] = color; opts['save'] = False; opts['new_figure'] = False
+            opts['color'] = color; opts['save'] = False; opts['new_figure'] = False; opts['plot_literature'] = False; opts['legend'] = False
 
         else:
 
@@ -352,7 +352,7 @@ def plot_state_xy(class_obj, x, y, state, what_model, **kwargs):
                 sm.set_array(opts['rho_maxs'])
                 opts['sm'] = sm
 
-            opts['color'] = color; opts['save'] = save; opts['new_figure'] = False
+            opts['color'] = color; opts['save'] = save; opts['new_figure'] = False; opts['plot_literature'] = plot_literature; opts['legend'] = legend
         
         plot_xy(class_obj, x, y, **opts)
 
