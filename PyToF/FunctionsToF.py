@@ -324,10 +324,10 @@ def relax_to_barotrope(class_obj, fixradius=True, fixmass=True, fixrot=True, pre
 
         #Check convergence:
         old_Js[old_Js==0]   = np.spacing(1) #Smallest numerically resolvable non-zero number
-        dJs                 = np.sum(np.abs((class_obj.Js                       /old_Js         - 1)))
+        dJs                 = np.max(np.abs((class_obj.Js                       /old_Js         - 1)))
         drot                =        np.abs( class_obj.m_rot_calc /old_m          - 1)
-        drho                = np.sum(np.abs( class_obj.rhoi[1:]                 /old_rho[1:]    - 1))
-
+        drho                = np.max(np.abs( class_obj.rhoi[1:]                 /old_rho[1:]    - 1))
+        
         if (drot    < class_obj.opts['drot_tol']    and
             dJs     < class_obj.opts['dJ_tol']      and
             drho    < class_obj.opts['drho_tol']):

@@ -13,7 +13,7 @@
 
 (* ::Input::Initialization:: *)
 ToFOrder =10;                      (*Theory of Figures will be computed until order ToFOrder*)
-DiffRotOrder = 22;              (*Rotational parameters \[Alpha] will be included until Subscript[\[Alpha], DiffRotOrder] for differential rotation*)
+DiffRotOrder = 22;          (*Rotational parameters \[Alpha] will be included until Subscript[\[Alpha], DiffRotOrder] for differential rotation*)
 Subscript[\[Rho], av]    =M/((4\[Pi])/3 Rm^3);
 l        =z*Rm;
 (*Variable names used in numerical algorithm:*)
@@ -67,8 +67,8 @@ res =s0/.OR^\[Alpha]_/;\[Alpha]>ToFOrder+1-i->0;
 time=AbsoluteTiming[s0fasts=Append[s0fasts,Expand[res^i]/.OR^\[Alpha]_/;\[Alpha]>ToFOrder->0]];
 Print[N[i/Max[ToFOrder,DiffRotOrder]*100,3],"% complete. Step took ", time[[1]]," seconds."];];
 Print["\!\(\*SubscriptBox[\(s\), \(0\)]\)=",s0/.s[\[Alpha]_,z Rm]->Subscript[s, \[Alpha]]/.OR->1];
-Print["\!\(\*SubscriptBox[\(s\), \(0\)]\)=",FortranForm[s0/.OR->1/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]]];
-Export[FileNameJoin[{DirectoryName[$InputFileName],"new_s0.txt"}],FortranForm[s0/.OR->1/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]],"Text"];
+Print["\!\(\*SubscriptBox[\(s\), \(0\)]\)=",FortranForm[FullSimplify[s0]/.OR->1/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]]];
+Export[FileNameJoin[{DirectoryName[$InputFileName],"new_s0.txt"}],FortranForm[FullSimplify[s0]/.OR->1/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]],"Text"];
 
 
 (* ::Subsubsection:: *)
@@ -199,8 +199,8 @@ For[i=0,i<ToFOrder+1,i++,Print[label[[i+1]],"=",fs[[i+1]]]];
 
 
 (* ::Input::Initialization:: *)
-For[i=0,i<ToFOrder+1,i++,Print[label[[i+1]],"=",FortranForm[fs[[i+1]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]]]]
-For[i=0,i<ToFOrder+1,i++,Export[FileNameJoin[{DirectoryName[$InputFileName],"f"<>ToString[2*i]<>".txt"}],FortranForm[fs[[i+1]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]],"Text"]];
+For[i=0,i<ToFOrder+1,i++,Print[label[[i+1]],"=",FortranForm[FullSimplify[fs[[i+1]]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]]]]
+For[i=0,i<ToFOrder+1,i++,Export[FileNameJoin[{DirectoryName[$InputFileName],"f"<>ToString[2*i]<>".txt"}],FortranForm[FullSimplify[fs[[i+1]]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]],"Text"]];
 
 
 (* ::Subsection:: *)
@@ -221,8 +221,8 @@ For[i=0,i<ToFOrder+1,i++,Print[labeldash[[i+1]],"=",fdashs[[i+1]]]];
 
 
 (* ::Input::Initialization:: *)
-For[i=0,i<ToFOrder+1,i++,Print[labeldash[[i+1]],"=",FortranForm[fdashs[[i+1]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]]]]
-For[i=0,i<ToFOrder+1,i++,Export[FileNameJoin[{DirectoryName[$InputFileName],"f"<>ToString[2*i]<>"p.txt"}],FortranForm[fdashs[[i+1]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]],"Text"]];
+For[i=0,i<ToFOrder+1,i++,Print[labeldash[[i+1]],"=",FortranForm[FullSimplify[fdashs[[i+1]]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]]]]
+For[i=0,i<ToFOrder+1,i++,Export[FileNameJoin[{DirectoryName[$InputFileName],"f"<>ToString[2*i]<>"p.txt"}],FortranForm[FullSimplify[fdashs[[i+1]]]/.Subscript[s, \[Alpha]_]->Indexed[ss,\[Alpha]+1]],"Text"]];
 
 
 (* ::Section:: *)
@@ -261,19 +261,19 @@ Print["+",Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],
 (*Subscript[A, 0]:*)
 expression=DisplayA[As[[1]]]/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]/.S[\[Alpha]_,z ]->Indexed[SS,\[Alpha]+1]/.Sdash[\[Alpha]_,z ]->Indexed[SSdash,\[Alpha]+1];
 (*Part without differential rotation:*)
-Print[labelA[[1]],"=",FortranForm[expression/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}]];
-Export[FileNameJoin[{DirectoryName[$InputFileName],"A0_no_DR.txt"}],FortranForm[expression/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}],"Text"];
+Print[labelA[[1]],"=",FortranForm[Simplify[expression]/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}]];
+Export[FileNameJoin[{DirectoryName[$InputFileName],"A0_no_DR.txt"}],FortranForm[Simplify[expression]/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}],"Text"];
 (*Part with differential rotation:*)
-Print["+",FortranForm[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}]];
-Export[FileNameJoin[{DirectoryName[$InputFileName],"A0_only_DR.txt"}],FortranForm[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}],"Text"];
+Print["+",FortranForm[Simplify[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}]];
+Export[FileNameJoin[{DirectoryName[$InputFileName],"A0_only_DR.txt"}],FortranForm[Simplify[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}],"Text"];
 (*Subscript[A, 2i]+Subscript[s, 2i]Subscript[S, 0] for i>0*)
 For[i=1,i<ToFOrder+1,i++,expression=DisplayA[As[[i+1]]+s[2*i,z Rm]*S[0,z]]/.s[\[Alpha]_,z Rm]->Indexed[ss,\[Alpha]+1]/.S[\[Alpha]_,z ]->Indexed[SS,\[Alpha]+1]/.Sdash[\[Alpha]_,z ]->Indexed[SSdash,\[Alpha]+1];
 (*Part without differential rotation:*)
-Print[labelA[[i+1]],"=",FortranForm[expression/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}]];
-Export[FileNameJoin[{DirectoryName[$InputFileName],"A"<>ToString[2*i]<>"+s"<>ToString[2*i]<>"S0_no_DR.txt"}],FortranForm[expression/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}],"Text"];
+Print[labelA[[i+1]],"=",FortranForm[Simplify[expression]/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}]];
+Export[FileNameJoin[{DirectoryName[$InputFileName],"A"<>ToString[2*i]<>"+s"<>ToString[2*i]<>"S0_no_DR.txt"}],FortranForm[Simplify[expression]/.{Subscript[\[Alpha], i_]->0}/.{m->m/3}],"Text"];
 (*Part with differential rotation:*)
-Print["+",FortranForm[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}]];
-Export[FileNameJoin[{DirectoryName[$InputFileName],"A"<>ToString[2*i]<>"+s"<>ToString[2*i]<>"S0_only_DR.txt"}],FortranForm[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}],"Text"]];
+Print["+",FortranForm[Simplify[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}]];
+Export[FileNameJoin[{DirectoryName[$InputFileName],"A"<>ToString[2*i]<>"+s"<>ToString[2*i]<>"S0_only_DR.txt"}],FortranForm[Simplify[Collect[Expand[expression-(expression/.{Subscript[\[Alpha], i_]->0})],m]]/.Subscript[\[Alpha], \[Beta]_]->Indexed[alphas,\[Beta]+1]/.{m->m/3}],"Text"]];
 
 
 (* ::Section:: *)

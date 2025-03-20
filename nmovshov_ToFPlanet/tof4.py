@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import warnings
 from scipy.interpolate import interp1d
+#import time
 
 def tof4(zvec, dvec, mrot, **kwargs):
     """Return gravity coefficients of self-gravitating rotating fluid.
@@ -94,24 +95,42 @@ def tof4(zvec, dvec, mrot, **kwargs):
 
     # The loop, following Nettelmann (2017) Appendix B
     Js = np.array([0, 0, 0, 0, 0]) # J0=0 ensures at least one iteration
+
+    #times = np.zeros(4)
+
     for it in range(opts['maxiter']):
+
         # Equations B.16-B.17
+        #tic = time.time()
         fs = B1617(ss)
+        #toc = time.time()
+        #times[0] += toc-tic
 
         # Equation B.9
+        #tic = time.time()
         SS = B9(zvec, dvec, fs)
+        #toc = time.time()
+        #times[1] += toc-tic
 
         # And finally, the system of simultaneous equations B.12-B.15.
+        #tic = time.time()
         ss = skipnspline_B1215(ss, SS, mrot, zvec, xind)
+        #toc = time.time()
+        #times[2] += toc-tic
 
         # Now the Js, by eqs. B.1 and B.11
+        #tic = time.time()
         new_Js, a0 = B111(ss, SS)
+        #toc = time.time()
+        #times[3] += toc-tic
 
         # Check for J2 convergence to terminate
         dJs = np.abs(Js - new_Js)
         if (it > 0) and (dJs[1] < opts['tol']):
             break
         Js = new_Js
+
+    #print('times [s]:', times)
 
     if (it == (opts['maxiter'] - 1)) and (opts['verbosity'] > 0):
         warnings.warn('Figure functions may not be fully converged.')

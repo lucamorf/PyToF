@@ -41,7 +41,8 @@ def generate_definitions_by_type(original_expr, transformed_expr):
 # Files to be generated for definitions; these will be skipped in processing
 def_files = {
     "power_definitions_s.txt", "power_definitions_z.txt",
-    "multiplication_definitions_s.txt", "multiplication_definitions_z.txt"
+    "multiplication_definitions_s.txt", "multiplication_definitions_z.txt",
+    "new_s0.txt", "R_ratio.txt"
 }
 
 all_power_defs_s = {}
