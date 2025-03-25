@@ -532,7 +532,7 @@ def classify_and_save_state(class_obj, state, what_model, what_save='none', log_
 
             pass
         
-        else:
+        elif not what_save=='good':
 
             raise KeyError(c.WARN + 'Invalid keyword for what_save! Use \'all\' or \'good\' or \'none\'.' + c.ENDC)
 
