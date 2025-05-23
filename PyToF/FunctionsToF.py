@@ -19,7 +19,7 @@ def _mass_int(class_obj):
     """
 
     #Negative sign because beginning of the array is the outer surface:
-    return -4*np.pi*np.trapz(class_obj.rhoi*class_obj.li**2, class_obj.li) 
+    return -4*np.pi*np.trapezoid(class_obj.rhoi*class_obj.li**2, class_obj.li) 
 
 def _fixradius(class_obj):
 
@@ -27,12 +27,27 @@ def _fixradius(class_obj):
     Renormalizes the level surfaces class_obj.li for consistency with the initially provided equatorial radius.
     """
 
-    #Renormalize the level surfaces in such a way that...
-    class_obj.li        = (class_obj.li/class_obj.li[0])*(class_obj.opts['R_init']/class_obj.R_ratio)
+    #Renormalize the level surfaces in such a way that the newly calculated R_calc equatorial radius is the same as the initial one:
+    if class_obj.opts['R_phys'][1] == 'equatorial':
 
-    #...the newly calculated R_calc equatorial radius is the same as the initial one:
-    class_obj.R_calc    = class_obj.li[0]*class_obj.R_ratio
-    assert np.isclose(class_obj.R_calc, class_obj.opts['R_init'])
+        class_obj.li        = (class_obj.li/class_obj.li[0])*(class_obj.opts['R_phys'][0]/class_obj.R_eq_to_R_m)
+        class_obj.R_calc    = class_obj.li[0]*class_obj.R_eq_to_R_m
+    
+    elif class_obj.opts['R_phys'][1] == 'mean':
+
+        class_obj.li        = (class_obj.li/class_obj.li[0])*class_obj.opts['R_phys'][0]
+        class_obj.R_calc    = class_obj.li[0]
+    
+    elif class_obj.opts['R_phys'][1] == 'polar':
+
+        class_obj.li        = (class_obj.li/class_obj.li[0])*(class_obj.opts['R_phys'][0]/class_obj.R_po_to_R_m)
+        class_obj.R_calc    = class_obj.li[0]*class_obj.R_po_to_R_m
+
+    else:
+
+        raise KeyError(c.WARN + 'Invalid R_phys type specification!' + c.ENDC)
+
+    assert np.isclose(class_obj.R_calc, class_obj.opts['R_phys'][0])
 
     #Update the mass:
     class_obj.M_calc    = _mass_int(class_obj)
@@ -44,11 +59,11 @@ def _fixmass(class_obj):
     """
 
     #Renormalize the densities in such a way that...
-    class_obj.rhoi      = class_obj.rhoi*class_obj.opts['M_init']/class_obj.M_calc
+    class_obj.rhoi      = class_obj.rhoi*class_obj.opts['M_phys']/class_obj.M_calc
 
     #...the newly calculated M_calc mass is the same as the initial one:
     class_obj.M_calc   = _mass_int(class_obj)
-    assert np.isclose(class_obj.M_calc, class_obj.opts['M_init'])
+    assert np.isclose(class_obj.M_calc, class_obj.opts['M_phys'])
 
 def _fixrot(class_obj):
 
@@ -69,7 +84,7 @@ def _pressurize(class_obj):
     class_obj.Pi[0] = class_obj.opts['P0']
 
     #See (B.3) in arXiv:1708.06177v1, flip since AlgoToF uses a different ordering logic:
-    U               = -class_obj.opts['G']*class_obj.opts['M_init']/class_obj.li[0]**3*class_obj.li**2*np.flip(class_obj.A0)
+    U               = -class_obj.opts['G']*class_obj.opts['M_phys']/class_obj.li[0]**3*class_obj.li**2*np.flip(class_obj.A0)
 
     #Approximate the gradient of U:
     gradU           = np.zeros_like(class_obj.li)
@@ -186,7 +201,7 @@ def get_U_l_mu(class_obj, mu):
             #Flip since AlgoToF uses a different ordering logic:
             U += np.outer(np.flip(class_obj.As[i,:]), np.polynomial.legendre.Legendre.basis(2*i)(mu))
 
-    return -class_obj.opts['G']*class_obj.opts['M_init']/class_obj.li[0]**3*np.outer(class_obj.li**2, np.ones_like(mu))*U
+    return -class_obj.opts['G']*class_obj.opts['M_phys']/class_obj.li[0]**3*np.outer(class_obj.li**2, np.ones_like(mu))*U
 
 def get_NMoI(class_obj, N=1000):
 
@@ -199,8 +214,8 @@ def get_NMoI(class_obj, N=1000):
 
     #Perform integrations:
     integrand_r_theta   = 2*np.pi * np.outer(class_obj.rhoi, np.ones_like(mu)) * get_r_l_mu(class_obj, mu)**4 * (1-np.outer(np.ones_like(class_obj.li), mu)**2)
-    integrand_r         = np.trapz(integrand_r_theta, mu, axis=1)
-    MoI                 = np.trapz(integrand_r, class_obj.li)*(-1) #minus sign due to integration from outside to inside
+    integrand_r         = np.trapezoid(integrand_r_theta, mu, axis=1)
+    MoI                 = np.trapezoid(integrand_r, class_obj.li)*(-1) #minus sign due to integration from outside to inside
     NMoI                = MoI/(class_obj.M_calc*class_obj.li[0]**2)
 
     return NMoI
@@ -229,7 +244,7 @@ def set_density_function(class_obj, fun):
     #Set function:
     class_obj.density_function = fun
  
-def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize=True):
+def relax_to_shape(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize=True):
 
     """
     Calls Algorithm from AlgoToF until either the accuray given by class_obj.opts['dJ_tol'] is fulfilled 
@@ -243,7 +258,7 @@ def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize
 
         for i in range(len(alphas)):
 
-            alphas[i] = 2*(i+1) * (class_obj.li[0])**(2*i) * class_obj.opts['alphas'][i] / ( ( class_obj.m_rot_calc*class_obj.opts['G']*class_obj.opts['M_init'] ) / class_obj.li[0]**3 ) / class_obj.opts['R_init']**(2*(i+1))
+            alphas[i] = 2*(i+1) * (class_obj.li[0])**(2*i) * class_obj.opts['alphas'][i] / ( ( class_obj.m_rot_calc*class_obj.opts['G']*class_obj.opts['M_phys'] ) / class_obj.li[0]**3 ) / class_obj.opts['R_ref']**(2*(i+1))
 
     tic = time.time()
 
@@ -251,6 +266,7 @@ def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize
     class_obj.Js, out = AlgoToF.Algorithm(  class_obj.li,
                                             class_obj.rhoi,
                                             class_obj.m_rot_calc,
+                                            R_ref       = class_obj.opts['R_ref'],
                                             order       = class_obj.opts['order'],
                                             nx          = class_obj.opts['nx'],
                                             tol         = class_obj.opts['dJ_tol'],
@@ -270,11 +286,12 @@ def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize
         print(c.INFO + 'Relaxing to hydrostatic equilibrium done in ' + c.NUMB + '{:.2e}'.format(toc-tic) + c.INFO + ' seconds.' + c.ENDC)
 
     #Save results, flipped since AlgoToF uses a different ordering logic:
-    class_obj.A0        = out.A0
-    class_obj.As        = out.As
-    class_obj.ss        = out.ss
-    class_obj.SS        = out.SS
-    class_obj.R_ratio   = out.R_ratio
+    class_obj.A0            = out.A0
+    class_obj.As            = out.As
+    class_obj.ss            = out.ss
+    class_obj.SS            = out.SS
+    class_obj.R_eq_to_R_m   = out.R_eq_to_R_m
+    class_obj.R_po_to_R_m   = out.R_po_to_R_m
 
     if fixradius:
 
@@ -297,7 +314,7 @@ def relax_to_HE(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize
 def relax_to_barotrope(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize=True):
 
     """
-    Calls relax_to_HE() and _update_densities() until either the accuray given by class_obj.opts['dJ_tol'], 
+    Calls relax_to_shape() and _update_densities() until either the accuray given by class_obj.opts['dJ_tol'], 
     class_obj.opts['drot_tol'] and class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterBar'] is reached.
     """
 
@@ -316,8 +333,8 @@ def relax_to_barotrope(class_obj, fixradius=True, fixmass=True, fixrot=True, pre
         old_m       = class_obj.m_rot_calc
         old_rho     = class_obj.rhoi
 
-        #Call relax_to_HE():
-        relax_to_HE(class_obj, fixradius=fixradius, fixmass=fixmass, fixrot=fixrot, pressurize=pressurize)
+        #Call relax_to_shape():
+        relax_to_shape(class_obj, fixradius=fixradius, fixmass=fixmass, fixrot=fixrot, pressurize=pressurize)
 
         #Call update_densities():
         _update_densities(class_obj, fixradius=fixradius, fixmass=fixmass, fixrot=fixrot)
@@ -362,7 +379,7 @@ def relax_to_barotrope(class_obj, fixradius=True, fixmass=True, fixrot=True, pre
 def relax_to_density(class_obj, fixradius=True, fixmass=True, fixrot=True, pressurize=True):
 
     """
-    Calls relax_to_HE() and _update_densities() until either the accuray given by class_obj.opts['dJ_tol'], 
+    Calls relax_to_shape() and _update_densities() until either the accuray given by class_obj.opts['dJ_tol'], 
     class_obj.opts['drot_tol'] and class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterDen'] is reached.
     """
 
@@ -381,8 +398,8 @@ def relax_to_density(class_obj, fixradius=True, fixmass=True, fixrot=True, press
         old_m       = class_obj.m_rot_calc
         old_rho     = class_obj.rhoi
 
-        #Call relax_to_HE():
-        relax_to_HE(class_obj, fixradius=fixradius, fixmass=fixmass, fixrot=fixrot, pressurize=pressurize)
+        #Call relax_to_shape():
+        relax_to_shape(class_obj, fixradius=fixradius, fixmass=fixmass, fixrot=fixrot, pressurize=pressurize)
 
         #Call _pressurize():
         _pressurize(class_obj)

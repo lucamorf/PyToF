@@ -12,11 +12,12 @@ def default_opts():
 
         """
         This function implements the standard parameters used for the algorithm,
-        except for the kwargs given by the user.
+        except for the kwargs given by the user.a
         """
 
         opts = {}
 
+        opts['R_ref']       = 1                 #Reference radius, normalisation constant for gravitational moment definition
         opts['order']       = 4                 #The Theory of Figures will be calculated up to this order
         opts['nx']          = -1                #Number of points that are actually calculated, -1 for all
         opts['tol']         = 1e-10             #Tolerance in the iterative procedure to find the Js
@@ -92,33 +93,21 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
         #The loop following arXiv:1708.06177v1:
         Js = np.zeros(opts['order']+1)
 
-        #times = np.zeros(4)
-
         for it in range(opts['maxiter']):
                 
                 #Equations (B.16) and (B.17) from arXiv:1708.06177v1:
-                #tic = time.time()
                 fs = SkipSpline_B1617(ss, z, xind, opts)
-                #toc = time.time()
-                #times[0] += toc-tic
 
                 #Equation (B.9) from arXiv:1708.06177v1:
-                #tic = time.time()
                 SS = B9(fs, z, rho, rho_bar, opts)
-                #toc = time.time()
-                #times[1] += toc-tic
 
                 #Equations (B.12)-(B.15) from arXiv:1708.06177v1:
-                #tic = time.time()
                 ss = SkipSpline_B1215(ss, SS, m_rot, z, xind, opts)
-                #toc = time.time()
-                #times[2] += toc-tic
 
                 #Equations (B.1) and (B.11) from arXiv:1708.06177v1:
-                #tic = time.time()
-                new_Js, R_ratio = B111(ss, SS, opts)
-                #toc = time.time()
-                #times[3] += toc-tic
+                assert mean_l[-1] == max(mean_l)
+                R_m_to_R_ref = mean_l[-1]/opts['R_ref']
+                new_Js, R_eq_to_R_m, R_po_to_R_m = B111(ss, SS, R_m_to_R_ref, opts)
 
                 #Check for convergence to terminate:
                 Js[Js==0] = np.spacing(1) #Smallest numerically resolvable non-zero number
@@ -150,14 +139,14 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
 
                 pass
 
-        out.dJs     = dJs                               #Difference between current and last iteration Js
-        out.it      = it                                #Number of iterations used by the algorithm
-        out.R_ratio = R_ratio                           #Ratio of equatorial to outermost mean level surface
-        out.m_rot   = m_rot*R_ratio**3                  #Calculated rotational parameter
-        out.ss      = ss                                #Calculated figure functions
-        out.SS      = SS                                #Calculated dimensionless volume integrals
-        out.A0      = B4(ss, SS, m_rot, z, opts)   #Calculated total potential
-        out.As      = SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=True)
+        out.dJs         = dJs                               #Difference between current and last iteration Js
+        out.it          = it                                #Number of iterations used by the algorithm
+        out.R_eq_to_R_m = R_eq_to_R_m                       #Ratio of equatorial to outermost mean level surface
+        out.R_po_to_R_m = R_po_to_R_m
+        out.ss          = ss                                #Calculated figure functions
+        out.SS          = SS                                #Calculated dimensionless volume integrals
+        out.A0          = B4(ss, SS, m_rot, z, opts)   #Calculated total potential
+        out.As          = SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=True)
 
         return Js, out
 
@@ -661,15 +650,16 @@ def SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=False):
         return ss #with shape corresponding to [index n, number of points]
 
 #Calculate the Js based on the Ss:
-def B111(ss, SS, opts):
+def B111(ss, SS, R_m_to_R_ref, opts):
 
         """
         Implements equation (B.1) and (B.11) from arXiv:1708.06177v1.
 
         INPUT:
-        ss:     List containing all figure function arrays according to arXiv:1708.06177v1.
-        SS:     List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
-        opts:   See ToF_Algorithm().
+        ss:             List containing all figure function arrays according to arXiv:1708.06177v1.
+        SS:             List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
+        R_m_to_R_ref:   Float containing the ratio of the outermost level surface to the reference radius.
+        opts:           See ToF_Algorithm().
 
         OUTPUT:
         Js:     Array containing all gravitational harmonics calculated according to arXiv:1708.06177v1.
@@ -678,17 +668,20 @@ def B111(ss, SS, opts):
         if opts['order'] == 4:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]
-                R_ratio = 1 + s0 - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_eq_to_R_m = 1 + s0 - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8
 
         elif opts['order'] == 7:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]; s10 = ss[5][-1]; s12 = ss[6][-1]; s14 = ss[7][-1]
-                R_ratio = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_eq_to_R_m = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8 + s10 + s12 + s14
 
         elif opts['order'] == 10:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]; s10 = ss[5][-1]; s12 = ss[6][-1]; s14 = ss[7][-1]; s16 = ss[8][-1]; s18 = ss[9][-1]; s20 = ss[10][-1]
-                R_ratio = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. + (6435*s16)/32768. - (12155*s18)/65536. - s2/2. + (46189*s20)/262144. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_eq_to_R_m = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. + (6435*s16)/32768. - (12155*s18)/65536. - s2/2. + (46189*s20)/262144. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
+                R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8 + s10 + s12 + s14 + s16 + s18 + s20
         
         else:
 
@@ -698,11 +691,11 @@ def B111(ss, SS, opts):
 
         for i in range(opts['order']+1):
 
-                Js.append(-(R_ratio**(-2*i))*SS[i][-1])
+                Js.append(-(R_m_to_R_ref**(2*i))*SS[i][-1])
 
         Js = np.array(Js)
 
-        return Js, R_ratio
+        return Js, R_eq_to_R_m, R_po_to_R_m
 
 #Calculate A0 based on the fs and the Ss:
 def B4(ss, SS, m_rot, z, opts):

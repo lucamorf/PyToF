@@ -27,15 +27,16 @@ class ToF:
                         'dJ_tol':           1e-10,  #Relative tolerance in the iterative procedure for the Js
                         'drot_tol':         1e-10,  #Relative tolerance in the iterative procedure for the rotational parameter
                         'drho_tol':         1e-10,  #Relative tolerance in the iterative procedure for the densities
-                        'MaxIterHE':        2,      #Maximum amount of iterations in AlgoToF when calling relax_to_HE()  
-                        'MaxIterBar':       100,    #Maximum amount of times relax_to_barotrope() calls relax_to_HE()
-                        'MaxIterDen':       100,    #Maximum amount of times relax_to_density() calls relax_to_HE()
+                        'MaxIterHE':        2,      #Maximum amount of iterations in AlgoToF when calling relax_to_shape()  
+                        'MaxIterBar':       100,    #Maximum amount of times relax_to_barotrope() calls relax_to_shape()
+                        'MaxIterDen':       100,    #Maximum amount of times relax_to_density() calls relax_to_shape()
                         'verbosity':        0,      #Higher numbers lead to more verbosity output in the console
                         
                         #Numbers are taken from Wisdom & Hubbard 2016, Differential rotation in Jupiter: A comparison of methods: 
                         'G':                6.6738480e-11,                                                      #Newtons gravitational constant in SI units
-                        'M_init':           126686536.1*(1000)**3/6.6738480e-11,                                #Initial mass of the planet in SI units
-                        'R_init':           71492000,                                                           #Initial equatorial radius of the planet in SI units
+                        'M_phys':           126686536.1*(1000)**3/6.6738480e-11,                                #Mass of the planet in SI units
+                        'R_ref':            None,                                                               #Reference radius of the planet in SI units
+                        'R_phys':           [71492000, 'equatorial'],                                           #Physical radius of the planet in SI units, including type specification
                         'Period':           2*np.pi/np.sqrt((126686536.1*(1000)**3*0.089195487)/(71492000**3)), #Initial rotation period of the planet in SI units
                         'P0':               0,                                                                  #Initial surface pressure of the planet in SI units
                         'Target_Js':        np.array([   1.398851089834702e-2,                                  #J2
@@ -101,22 +102,24 @@ class ToF:
         - ss:               List of arrays, figure functions introduced in Eq. (B.1) in arXiv:1708.06177v1
         - SS:               List of arrays, dimensionless volume integrals introduced in Eq. (B.7) in arXiv:1708.06177v1
         - A0:               Array, important to determine the total potential introduced in Eq. (B.3) in arXiv:1708.06177v1
-        - R_ratio:          Float, ratio of the equatorial radius to the to outermost mean surface layer 
+        - R_eq_to_R_m:      Float, ratio of the equatorial radius to the to outermost mean surface layer 
+        - R_po_to_R_m:      Float, ratio of the polar radius to the to outermost mean surface layer 
         - baro_param_calc:  Possibly updated parameters used by the barotrope function set via set_barotrope()
         - dens_param_calc:  Possibly updated parameters used by the density function set via set_density_function()
         """
 
-        self.li                 = np.linspace(1, 1/self.opts['N'], self.opts['N'])*self.opts['R_init']
-        self.rhoi               = np.ones(self.opts['N'])*self.opts['M_init']/(4*np.pi/3*self.opts['R_init']**3)
+        self.li                 = np.linspace(1, 1/self.opts['N'], self.opts['N'])*self.opts['R_phys'][0]
+        self.rhoi               = np.ones(self.opts['N'])*self.opts['M_phys']/(4*np.pi/3*self.opts['R_phys'][0]**3)
         self.Pi                 = np.zeros(self.opts['N'])
         self.Js                 = np.hstack((-1, np.zeros(self.opts['order'])))
-        self.M_calc             = self.opts['M_init']
-        self.R_calc             = self.opts['R_init']
-        self.m_rot_calc         = (2*np.pi/self.opts['Period'])**2*self.li[0]**3/(self.opts['G']*self.opts['M_init'])
+        self.M_calc             = self.opts['M_phys']
+        self.R_calc             = self.opts['R_phys'][0]
+        self.m_rot_calc         = (2*np.pi/self.opts['Period'])**2*self.li[0]**3/(self.opts['G']*self.opts['M_phys'])
         self.ss                 = (self.opts['order']+1)*[np.zeros(self.opts['N'])]
         self.SS                 = (self.opts['order']+1)*[np.zeros(self.opts['N'])]
         self.A0                 = np.zeros(self.opts['N'])
-        self.R_ratio            = 1.
+        self.R_eq_to_R_m        = 1.
+        self.R_po_to_R_m        = 1.
         self.baro_param_calc    = self.opts['baro_param_init']
         self.dens_param_calc    = self.opts['dens_param_init']
         
@@ -128,15 +131,23 @@ class ToF:
 
         #Set initial values:
         self.opts  = self._default_opts(kwargs)
+        assert len(self.opts['R_phys']) == 2, c.WARN + 'R_phys must be a list-like object with length 2! First entry: float: radius in SI units, Second entry: string: \'equatorial\', \'mean\', \'polar\'' + c.ENDC
+        assert self.opts['R_phys'][1] in ['equatorial', 'mean', 'polar'], c.WARN + 'The second entry of R_phys must be a string, options: \'equatorial\', \'mean\', \'polar\'' + c.ENDC
+
+        if self.opts['R_ref'] is None:
+            
+            print(c.WARN + 'No reference radius supplied by the user. PyToF assumes R_ref = R_phys.' + c.ENDC)
+            self.opts['R_ref'] = self.opts['R_phys'][0]
+
         self._set_IC()
 
         #Define routines for the user: 
-        from PyToF.FunctionsToF import get_r_l_mu, set_barotrope, set_density_function, relax_to_HE, relax_to_barotrope, relax_to_density, get_U_l_mu, get_NMoI
+        from PyToF.FunctionsToF import get_r_l_mu, set_barotrope, set_density_function, relax_to_shape, relax_to_barotrope, relax_to_density, get_U_l_mu, get_NMoI
 
         self.get_r_l_mu             = functools.partial(get_r_l_mu,             self)
         self.set_barotrope          = functools.partial(set_barotrope,          self)
         self.set_density_function   = functools.partial(set_density_function,   self)
-        self.relax_to_HE            = functools.partial(relax_to_HE,            self)
+        self.relax_to_shape         = functools.partial(relax_to_shape,         self)
         self.relax_to_barotrope     = functools.partial(relax_to_barotrope,     self)
         self.relax_to_density       = functools.partial(relax_to_density,       self)
         self.get_U_l_mu             = functools.partial(get_U_l_mu,             self)

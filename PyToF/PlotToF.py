@@ -78,6 +78,7 @@ def default_opts():
     opts['len_color_bar']   = 0.04
     opts['uni_color']       = False
     opts['bins']            = None
+    opts['Js_data']         = False
 
     return opts
 
@@ -410,7 +411,6 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, **kwargs):
         Js_list.append(class_obj.Js)
         color_list.append(color)
         
-
     Js_list = np.array(Js_list)
     
     plt.rcParams['axes.xmargin'] = opts['xmargin']
@@ -426,40 +426,44 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, **kwargs):
 
     ax_histx.tick_params(axis="x", labelbottom=False)
     ax_histy.tick_params(axis="y", labelleft=False)
-    
+
     if x >= len(Js_list[0,:]):
 
         x_label = r'$b_{' + str(x-len(Js_list[0,:])) + r'}$'
-        x = state[:,x-len(Js_list[0,:])]
+        x_array = state[:,x-len(Js_list[0,:])]
         
     else:
 
         x_label = r'$J_{' + str(2*x) + r'}$'
-        x = Js_list[:,x]
+        x_array = Js_list[:,x]
 
     if y >= len(Js_list[0,:]):
 
         y_label = r'$b_{' + str(y-len(Js_list[0,:])) + r'}$'
-        y = state[:,y-len(Js_list[0,:])]
+        y_array = state[:,y-len(Js_list[0,:])]
         
     else:
 
         y_label = r'$J_{' + str(2*y) + r'}$'
-        y = Js_list[:,y]
+        y_array = Js_list[:,y]
 
-    x_scale = math.floor(math.log(np.max(abs(x)), 10))+1
-    y_scale = math.floor(math.log(np.max(abs(y)), 10))+1
+    x_scale = math.floor(math.log(np.max(abs(x_array)), 10))+1
+    y_scale = math.floor(math.log(np.max(abs(y_array)), 10))+1
+
+    if opts['Js_data'] and (x < len(Js_list[0,:]) and y < len(Js_list[0,:])):
+
+        ax.errorbar(class_obj.opts['Target_Js'][x-1]/10**x_scale, class_obj.opts['Target_Js'][y-1]/10**y_scale, xerr = class_obj.opts['Sigma_Js'][x-1]/10**x_scale, yerr = class_obj.opts['Sigma_Js'][y-1]/10**y_scale, color='k', capsize=3)
     
-    x /= 10**x_scale
-    y /= 10**y_scale
+    x_array /= 10**x_scale
+    y_array /= 10**y_scale
 
     x_label += r' [$\cdot 10^{'+str(-1*x_scale)+'}$]'
     y_label += r' [$\cdot 10^{'+str(-1*y_scale)+'}$]'
         
-    ax.scatter(x, y, color=color_list)
+    ax.scatter(x_array, y_array, color=color_list)
 
-    ax_histx.hist(x, bins=opts['bins'], color='black')
-    ax_histy.hist(y, bins=opts['bins'], color='black', orientation='horizontal')
+    ax_histx.hist(x_array, bins=opts['bins'], color='black')
+    ax_histy.hist(y_array, bins=opts['bins'], color='black', orientation='horizontal')
 
     ax.set_xlabel(x_label, fontsize=opts['fontsize'])
     ax.set_ylabel(y_label, fontsize=opts['fontsize'])
@@ -481,13 +485,13 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, **kwargs):
 
         p1, = ax.plot(np.nan, np.nan)
         p2, = ax.plot(np.nan, np.nan)
-        ax.legend([p1,p2], [r"$\rho=${:.2f}".format(scipy.stats.spearmanr(x, y, nan_policy='omit')[0]), r"$p=${:.2f}".format(scipy.stats.spearmanr(x, y, nan_policy='omit')[1])], 
+        ax.legend([p1,p2], [r"$\rho=${:.2f}".format(scipy.stats.spearmanr(x_array, y_array, nan_policy='omit')[0]), r"$p=${:.2f}".format(scipy.stats.spearmanr(x_array, y_array, nan_policy='omit')[1])], 
                   handletextpad=0, handlelength=0, ncol=opts['legend_ncol'], fontsize=opts['legend_fontsize'], loc=opts['legend_loc'], framealpha=opts['legend_frame_alpha'])
 
-        ax_histx.legend([p1,p2], [r"$\mu=${:.2f}".format(np.average(x)), r"$\sigma=${:.2f}".format(np.std(x))], 
+        ax_histx.legend([p1,p2], [r"$\mu=${:.2f}".format(np.average(x_array)), r"$\sigma=${:.2f}".format(np.std(x_array))], 
                   handletextpad=0, handlelength=0, ncol=opts['legend_ncol'], fontsize=opts['legend_fontsize'], loc=opts['legend_loc'], framealpha=opts['legend_frame_alpha'])
 
-        ax_histy.legend([p1,p2], [r"$\mu=${:.2f}".format(np.average(y)), r"$\sigma=${:.2f}".format(np.std(y))], 
+        ax_histy.legend([p1,p2], [r"$\mu=${:.2f}".format(np.average(y_array)), r"$\sigma=${:.2f}".format(np.std(y_array))], 
                   handletextpad=0, handlelength=0, ncol=opts['legend_ncol'], fontsize=opts['legend_fontsize'], loc=opts['legend_loc'], framealpha=opts['legend_frame_alpha'])
 
     if opts['save']:
