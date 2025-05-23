@@ -27,7 +27,7 @@ class ToF:
                         'dJ_tol':           1e-10,  #Relative tolerance in the iterative procedure for the Js
                         'drot_tol':         1e-10,  #Relative tolerance in the iterative procedure for the rotational parameter
                         'drho_tol':         1e-10,  #Relative tolerance in the iterative procedure for the densities
-                        'MaxIterHE':        2,      #Maximum amount of iterations in AlgoToF when calling relax_to_shape()  
+                        'MaxIterShape':     2,      #Maximum amount of iterations in AlgoToF when calling relax_to_shape()  
                         'MaxIterBar':       100,    #Maximum amount of times relax_to_barotrope() calls relax_to_shape()
                         'MaxIterDen':       100,    #Maximum amount of times relax_to_density() calls relax_to_shape()
                         'verbosity':        0,      #Higher numbers lead to more verbosity output in the console

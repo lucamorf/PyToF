@@ -248,7 +248,7 @@ def relax_to_shape(class_obj, fixradius=True, fixmass=True, fixrot=True, pressur
 
     """
     Calls Algorithm from AlgoToF until either the accuray given by class_obj.opts['dJ_tol'] is fulfilled 
-    or class_obj.opts['MaxIterHE'] is reached.
+    or class_obj.opts['MaxIterShape'] is reached.
     """
 
     alphas = np.zeros(len(class_obj.opts['alphas']))
@@ -270,7 +270,7 @@ def relax_to_shape(class_obj, fixradius=True, fixmass=True, fixrot=True, pressur
                                             order       = class_obj.opts['order'],
                                             nx          = class_obj.opts['nx'],
                                             tol         = class_obj.opts['dJ_tol'],
-                                            maxiter     = class_obj.opts['MaxIterHE'],
+                                            maxiter     = class_obj.opts['MaxIterShape'],
                                             verbosity   = class_obj.opts['verbosity'],
                                             alphas      = alphas,
                                             H           = class_obj.opts['H'],
