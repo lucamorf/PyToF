@@ -4,7 +4,6 @@
 
 import numpy as np
 import scipy
-#import time
 
 from PyToF.color import c
 
@@ -12,29 +11,33 @@ def default_opts():
 
         """
         This function implements the standard parameters used for the algorithm,
-        except for the kwargs given by the user.a
+        except for the kwargs given by the user.
         """
 
         opts = {}
 
-        opts['R_ref']       = 1                 #Reference radius, normalisation constant for gravitational moment definition
-        opts['order']       = 4                 #The Theory of Figures will be calculated up to this order
-        opts['nx']          = -1                #Number of points that are actually calculated, -1 for all
-        opts['tol']         = 1e-10             #Tolerance in the iterative procedure to find the Js
-        opts['maxiter']     = 100               #Maximum amount of iterations used in the algorithm
-        opts['verbosity']   = 1                 #Higher numbers lead to more verbosity output in the console
+        #Numerical parameters:
+        opts['order']       = 4                 #Determines the Theory of Figures order used by AlgoToF. Available options: 4, 7, 10.
+        opts['n_bin']       = 1                 #Binsize for calculation speed-up, 1 means that the figure functions will be calculated for all the points supplied.
+        opts['tol']         = 1e-10             #Convergence criterion, determines when the iterative procedure has converged on the gravitational moment values.
+        opts['maxiter']     = 100               #Maximum amount of iterations used in the algorithm, prevents unreasonable runtimes.
+        opts['verbosity']   = 1                 #Higher integer numbers lead to more verbosity output in the console. 0 corresponds to no output.
 
-        opts['alphas']      = np.zeros(4)       #Differential rotation parameters
+        #Physical parameters:
+        opts['R_ref']       = 1                 #Reference radius, normalisation constant for gravitational moment definition.
+        opts['ss_initial']  = None              #Initial guess for the figure functions, important for successive AlgoToF calls.
+        opts['alphas']      = np.zeros(4)       #Differential rotation parameters, of the form 
+
+        #Not yet fully implemented:
         opts['H']           = 0.                #Exponential decay parameter
-        opts['ss_guesses']  = None              #Initial guess for the figure functions
-
+        
         return opts
 
 def Algorithm(mean_l, rho, m_rot, **kwargs):
 
         """
         This function implements the Theory of Figures for planets as laid out in arXiv:1708.06177v1.
-        The main results produced by this function for the user is out.Js.
+        The main results produced by this function for the user are stored in out.Js.
 
         INPUT:
         mean_l:         Array with mean levels surfaces l    
@@ -47,106 +50,97 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
                         equatorial to mean outermost radius and the figure functions.
         """
 
-        #Minimal input control:
-        mean_l  = np.array(mean_l)
-        rho     = np.array(rho)
-        p       = np.argsort(mean_l) #Integrals in B9() easier to implement with inside->outside radii
-        mean_l  = mean_l[p]
-        rho     = rho[p]
-
-        mean_l[mean_l == 0] = np.spacing(1) #Smallest numerically resolvable non-zero number
-
-        assert mean_l.shape == rho.shape
-        assert m_rot >= 0
-
         #Initialize default and passed **kwargs:
         opts = {**default_opts(), **kwargs}
 
+        #Minimal input control:
+        mean_l = np.array(mean_l); rho = np.array(rho)
+
+        p = np.argsort(mean_l) #Inside -> outside radii to ensure consistency with B9() implementation
+        mean_l = mean_l[p]; rho = rho[p]
+
+        mean_l[mean_l == 0] = np.spacing(1) #Smallest numerically resolvable non-zero number
+
+        assert mean_l.shape == rho.shape, c.WARN + 'mean_l and rho do not have the same shape!' + c.ENDC
+        assert m_rot >= 0, c.WARN + 'm_rot is negative!' + c.ENDC
+        assert np.isscalar(opts['n_bin']), c.WARN + 'Vector n_bin feature not yet implemented!' + c.ENDC #Idea: provide non-equidistant points
+
         #Define and initialize local variables:
-        N = len(mean_l)
+        N               = len(mean_l)
+        R_m_to_R_ref    = mean_l[-1]/opts['R_ref']
         
         #Calculate rho_bar:
-        #M       = 4*np.pi*np.sum(rho*mean_l**2*(mean_l - np.append(0,mean_l[:-1]))) also works!
         M       = 4*np.pi*scipy.integrate.trapezoid(rho*mean_l**2, mean_l)
-        rho_bar = M/((4*np.pi/3)*np.max(mean_l)**3)
+        rho_bar = M/((4*np.pi/3)*mean_l[-1]**3)
 
         #Normalize radii:
-        z       = mean_l/np.max(mean_l)
+        z = mean_l/mean_l[-1]
 
-        if opts['ss_guesses'] is None:
-
+        #Initial guess for the figure functions:
+        #ss = (opts['order']+1)*[np.zeros(N)] if (opts['ss_initial'] is None) else ss = opts['ss_initial']
+        if (opts['ss_initial'] is None):
                 ss = (opts['order']+1)*[np.zeros(N)]
-        
         else:
+                ss = opts['ss_initial']
+
+        #Initial values for the gravitational moments:
+        Js = np.zeros(opts['order']+1)
         
-                ss = opts['ss_guesses']
-
-        if np.isscalar(opts['nx']):
-
-                steps = int(max(np.fix(N/opts['nx']), 1)) #np.fix(): Round to nearest integer towards zero
-                xind = range(0, N, steps)
-
-        else:
-
-                raise(Exception("Vector nx feature not yet implemented")) #Idea: provide non-equidistant points
+        #Binning for calculation speed-up:
+        indeces = range(0, N, int(max(np.round(N/opts['n_bin']), 1)))
 
         #The loop following arXiv:1708.06177v1:
-        Js = np.zeros(opts['order']+1)
-
         for it in range(opts['maxiter']):
                 
                 #Equations (B.16) and (B.17) from arXiv:1708.06177v1:
-                fs = SkipSpline_B1617(ss, z, xind, opts)
+                fs = SkipSpline_B1617(ss, z, indeces, opts)
 
                 #Equation (B.9) from arXiv:1708.06177v1:
                 SS = B9(fs, z, rho, rho_bar, opts)
 
                 #Equations (B.12)-(B.15) from arXiv:1708.06177v1:
-                ss = SkipSpline_B1215(ss, SS, m_rot, z, xind, opts)
+                ss = SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts)
 
                 #Equations (B.1) and (B.11) from arXiv:1708.06177v1:
-                assert mean_l[-1] == max(mean_l)
-                R_m_to_R_ref = mean_l[-1]/opts['R_ref']
                 new_Js, R_eq_to_R_m, R_po_to_R_m = B111(ss, SS, R_m_to_R_ref, opts)
 
                 #Check for convergence to terminate:
-                Js[Js==0] = np.spacing(1) #Smallest numerically resolvable non-zero number
+                Js[Js == 0] = np.spacing(1)
                 dJs = np.abs((Js - new_Js)/Js)
 
                 if (it > 0) and (np.max(dJs) < opts['tol']):
 
                         break
 
+                #Update gravitational moment values:
                 Js = new_Js
 
-        #print('times [s]:', times)
-
         #Verbosity output:
+        string = c.WARN + 'Convergence warning: max(dJs) = ' + c.NUMB + "{:.0e}".format(np.max(dJs)) + c.WARN + ' > ' + c.NUMB + "{:.0e}".format(opts['tol']) + c.WARN + ' after maxiter = ' + c.NUMB + str(opts['maxiter']) + c.WARN + ' iterations.' + c.ENDC
+
         if (it == (opts['maxiter'] - 1)) and (opts['verbosity'] > 0) and (np.max(dJs) > opts['tol']):
-                
-                string = c.WARN + 'Convergence warning: max(dJs) = ' + c.NUMB + "{:.0e}".format(np.max(dJs)) + c.WARN + ' > ' + c.NUMB + "{:.0e}".format(opts['tol']) + c.WARN + ' after maxiter = ' + c.NUMB + str(opts['maxiter']) + c.WARN + ' iterations.' + c.ENDC
+
                 print(string, end='\r')
 
         elif opts['verbosity'] > 0:
                 
-                string = c.WARN + 'Convergence warning: max(dJs) = ' + c.NUMB + "{:.0e}".format(np.max(dJs)) + c.WARN + ' > ' + c.NUMB + "{:.0e}".format(opts['tol']) + c.WARN + ' after maxiter = ' + c.NUMB + str(opts['maxiter']) + c.WARN + ' iterations.' + c.ENDC
                 print(' '*len(string), end='\r')
 
         #Output:
-        Js          = new_Js
+        Js = new_Js
 
         class out:
 
                 pass
 
-        out.dJs         = dJs                               #Difference between current and last iteration Js
-        out.it          = it                                #Number of iterations used by the algorithm
-        out.R_eq_to_R_m = R_eq_to_R_m                       #Ratio of equatorial to outermost mean level surface
-        out.R_po_to_R_m = R_po_to_R_m
-        out.ss          = ss                                #Calculated figure functions
-        out.SS          = SS                                #Calculated dimensionless volume integrals
-        out.A0          = B4(ss, SS, m_rot, z, opts)   #Calculated total potential
-        out.As          = SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=True)
+        out.dJs         = dJs                           #Difference between current and last iteration Js
+        out.it          = it                            #Number of iterations used by the algorithm
+        out.R_eq_to_R_m = R_eq_to_R_m                   #Ratio of equatorial to outermost mean level surface
+        out.R_po_to_R_m = R_po_to_R_m                   #Ratio of equatorial to outermost mean level surface
+        out.ss          = ss                            #Calculated figure functions
+        out.SS          = SS                            #Calculated dimensionless volume integrals
+        out.A0          = B4(ss, SS, m_rot, z, opts)    #Calculated total potential
+        out.As          = SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts, returnAs=True)
 
         return Js, out
 
@@ -301,7 +295,7 @@ def B1617(ssarray, opts):
 
         return fs
 
-def SkipSpline_B1617(ss, z, xind, opts):
+def SkipSpline_B1617(ss, z, indeces, opts):
 
         """
         Implements equation (B.16) and (B.17) from arXiv:1708.06177v1 for a subset of points to speed up the calculation.
@@ -309,7 +303,7 @@ def SkipSpline_B1617(ss, z, xind, opts):
         INPUT:
         ss:     List containing all figure function arrays according to arXiv:1708.06177v1.
         z:      See ToF_Algorithm().
-        xind:   Array where B1617() is actually computed.
+        indeces:   Array where B1617() is actually computed.
         opts:   See ToF_Algorithm().
 
         OUTPUT:
@@ -317,16 +311,16 @@ def SkipSpline_B1617(ss, z, xind, opts):
         """
 
         #Skip:
-        s_skip = np.array([s[xind] for s in ss]).T #with shape corresponding to [number of points, index n]
+        s_skip = np.array([s[indeces] for s in ss]).T #with shape corresponding to [number of points, index n]
 
         new_fs = B1617(s_skip, opts) #with shape corresponding to [index n (for normal and primed quantities), number of points]
 
         #Spline:
-        if len(xind) < len(z):
+        if len(indeces) < len(z):
 
                 for k in range(len(new_fs)):
                 
-                        new_fs[k] = scipy.interpolate.interp1d(z[xind], new_fs[k], 'cubic', fill_value='extrapolate')(z)
+                        new_fs[k] = scipy.interpolate.interp1d(z[indeces], new_fs[k], 'cubic', fill_value='extrapolate')(z)
 
         return new_fs
 
@@ -351,19 +345,6 @@ def B9(fs, z, rho, rho_bar, opts):
         new_SS  = []
 
         #Calculate the dimensionless volume integrals:
-        """
-        for i in range(opts['order']+1):
-
-                I = scipy.integrate.cumulative_trapezoid(z**(2*i+3)*fs[i], x=rho/rho_bar, initial=0)
-                new_SS.append(np.nan_to_num(rho/rho_bar*fs[i] - z**-(2*i+3)*I))
-
-        for i in range(opts['order']+1):
-
-                Ip = scipy.integrate.cumulative_trapezoid(z**(2-2*i)*fs[opts['order']+1+i], x=rho/rho_bar, initial=0)
-                Ip = Ip[N] - Ip
-                new_SS.append(np.nan_to_num(-rho/rho_bar*fs[opts['order']+1+i] + z**-(2-2*i)*(rho[N]/rho_bar*(fs[opts['order']+1+i])[N] - Ip)))
-        """
-
         I = scipy.integrate.cumulative_trapezoid(z**(2*np.arange(opts['order']+1)+3)[:, None] * np.array(fs[:opts['order']+1]), x=rho/rho_bar, initial=0, axis=-1)
 
         for i in range(opts['order']+1):
@@ -579,7 +560,7 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
         return new_sn0
 
-def SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=False):
+def SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts, returnAs=False):
 
         """
         Implements equation (B.12)-(B.15) from arXiv:1708.06177v1 for a subset of points to speed up the calculation.
@@ -589,7 +570,7 @@ def SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=False):
         SS:     List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
         m_rot:  Rotational parameter as defined in arXiv:1708.06177v1.
         z:      See ToF_Algorithm().
-        xind:   Array where B1215() is actually computed.
+        indeces:   Array where B1215() is actually computed.
         opts:   See ToF_Algorithm().
 
         OUTPUT:
@@ -597,10 +578,10 @@ def SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=False):
         """
 
         #Skip:
-        S_skip  = np.array([S[xind] for S in SS]).T                     #with shape corresponding to [number of points, index n]
-        s_skip  = np.array([s[xind] for s in ss]).T                     #with shape corresponding to [number of points, index n]
+        S_skip  = np.array([S[indeces] for S in SS]).T                     #with shape corresponding to [number of points, index n]
+        s_skip  = np.array([s[indeces] for s in ss]).T                     #with shape corresponding to [number of points, index n]
 
-        new_sn0 = B1215(s_skip, S_skip, m_rot, z[xind], opts)      #with shape corresponding to [number of points, index n]
+        new_sn0 = B1215(s_skip, S_skip, m_rot, z[indeces], opts)      #with shape corresponding to [number of points, index n]
        
         if opts['order'] == 4:
 
@@ -631,11 +612,11 @@ def SkipSpline_B1215(ss, SS, m_rot, z, xind, opts, returnAs=False):
         #Spline:
         ss = []
 
-        if len(xind) < len(z):
+        if len(indeces) < len(z):
 
                 for i in range(opts['order']+1):
 
-                        ss.append(scipy.interpolate.interp1d(z[xind], new_ss[:,i], 'cubic', fill_value='extrapolate')(z))
+                        ss.append(scipy.interpolate.interp1d(z[indeces], new_ss[:,i], 'cubic', fill_value='extrapolate')(z))
 
         else:
 

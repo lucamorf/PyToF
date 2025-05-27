@@ -266,16 +266,15 @@ def relax_to_shape(class_obj, fixradius=True, fixmass=True, fixrot=True, pressur
     class_obj.Js, out = AlgoToF.Algorithm(  class_obj.li,
                                             class_obj.rhoi,
                                             class_obj.m_rot_calc,
-                                            R_ref       = class_obj.opts['R_ref'],
                                             order       = class_obj.opts['order'],
-                                            nx          = class_obj.opts['nx'],
+                                            n_bin       = class_obj.opts['nx'],
                                             tol         = class_obj.opts['dJ_tol'],
                                             maxiter     = class_obj.opts['MaxIterShape'],
                                             verbosity   = class_obj.opts['verbosity'],
+                                            R_ref       = class_obj.opts['R_ref'],
+                                            ss_initial  = class_obj.ss,
                                             alphas      = alphas,
-                                            H           = class_obj.opts['H'],
-                                            ss_guesses  = class_obj.ss
-                                            )
+                                            H           = class_obj.opts['H'])
     
     toc = time.time()
 
