@@ -40,10 +40,10 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
         The main results produced by this function for the user are stored in out.Js.
 
         INPUT:
-        mean_l:         Array with mean levels surfaces l    
-        rho:            Array with the densities at these mean level surfaces l
-        m_rot:          Rotational parameter as defined in arXiv:1708.06177v1
-        kwargs:         Additional parameters, see default_opts()
+        mean_l:         Array with mean levels surfaces l.
+        rho:            Array with the densities at these mean level surfaces l.
+        m_rot:          Rotational parameter as defined in arXiv:1708.06177v1.
+        kwargs:         Additional parameters, see default_opts().
 
         OUTPUT:
         class out:      Contains various results, such as the gravitational harmonics, the ratio of the
@@ -77,10 +77,12 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
         z = mean_l/mean_l[-1]
 
         #Initial guess for the figure functions:
-        #ss = (opts['order']+1)*[np.zeros(N)] if (opts['ss_initial'] is None) else ss = opts['ss_initial']
         if (opts['ss_initial'] is None):
+
                 ss = (opts['order']+1)*[np.zeros(N)]
+
         else:
+
                 ss = opts['ss_initial']
 
         #Initial values for the gravitational moments:
@@ -127,22 +129,18 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
                 print(' '*len(string), end='\r')
 
         #Output:
-        Js = new_Js
-
         class out:
 
                 pass
 
-        out.dJs         = dJs                           #Difference between current and last iteration Js
         out.it          = it                            #Number of iterations used by the algorithm
         out.R_eq_to_R_m = R_eq_to_R_m                   #Ratio of equatorial to outermost mean level surface
         out.R_po_to_R_m = R_po_to_R_m                   #Ratio of equatorial to outermost mean level surface
         out.ss          = ss                            #Calculated figure functions
         out.SS          = SS                            #Calculated dimensionless volume integrals
         out.A0          = B4(ss, SS, m_rot, z, opts)    #Calculated total potential
-        out.As          = SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts, returnAs=True)
 
-        return Js, out
+        return new_Js, out
 
 #Calculate the fs based on the ss:
 def B1617(ssarray, opts):
@@ -152,13 +150,11 @@ def B1617(ssarray, opts):
 
         INPUT:
         ssarray:        Array containing all figure function arrays according to arXiv:1708.06177v1.
-        opts:           See ToF_Algorithm().
+        opts:           See Algorithm().
 
         OUTPUT:
-        fs:             List containing all coefficients fi arrays according to arXiv:1708.06177v1.
+        new_fs:         List containing all NEW coefficients arrays according to arXiv:1708.06177v1.
         """
-
-        N = ssarray.shape[0]
 
         if opts['order'] == 4:
 
@@ -188,7 +184,7 @@ def B1617(ssarray, opts):
 
                 f8p = (-7*(1944*s2h4 - 5040*s2h2_s4 + 1225*s4h2 + 2772*s2_s6))/36465. + (3*s8)/17.
 
-                fs = [f0, f2, f4, f6, f8, f0p, f2p, f4p, f6p, f8p]
+                new_fs = [f0, f2, f4, f6, f8, f0p, f2p, f4p, f6p, f8p]
 
         elif opts['order'] == 7:
 
@@ -231,7 +227,7 @@ def B1617(ssarray, opts):
 
                 f14p = (3*s14)/29. + (13*(7138368*s2h7 - 32387040*s2h5_s4 + 20956320*s2h4_s6 + 1386*s2h2*(4199*s10 - 22050*s4_s6) + 385*(-4199*s10_s4 + 3*s6*(3430*s4h2 - 1287*s8)) + 9450*s2h3*(3920*s4h2 - 1287*s8) - 21*s2*(96577*s12 + 428750*s4h3 - 213444*s6h2 - 450450*s4_s8)))/4.8474225e7
 
-                fs = [f0, f2, f4, f6, f8, f10, f12, f14, f0p, f2p, f4p, f6p, f8p, f10p, f12p, f14p]         
+                new_fs = [f0, f2, f4, f6, f8, f10, f12, f14, f0p, f2p, f4p, f6p, f8p, f10p, f12p, f14p]         
 
         elif opts['order'] == 10:
 
@@ -287,13 +283,13 @@ def B1617(ssarray, opts):
 
                 f20p = (3*s20)/41. - (19*(372887349120*s2h10 - 2416862448000*s2h8_s4 - 32353475000*s4h5 + 1636029964800*s2h7_s6 - 151484256*s2h5*(-4199*s10 + 35280*s4_s6) + 343000*s4h2*(-96577*s12 + 320166*s6h2) + 151200*s2h3*(1002915*s14 + 1694*(-4199*s10_s4 + 3*s6*(5635*s4h2 - 1287*s8))) + 826277760*s2h6*(6125*s4h2 - 1287*s8) + 77252175000*s4h3_s8 - 80332560*s2h4*(4199*s12 + 49000*s4h3 - 15246*s6h2 - 32175*s4_s8) + 22*(193947611*s10h2 + 421224300*s14_s6 - 4095*(-96577*s12 + 304920*s6h2)*s8) - 90*s2*(-151252255*s18 + 936054000*s14_s4 + 88*(-36006425*s10_s4h2 + 9464546*s12_s6 + 92438500*s4h3_s6 - 10458756*s6h3 + 9006855*s10_s8 - 66216150*s4_s6*s8)) - 525*s4*(-20036013*s16 + 6292*(18088*s10_s6 + 8775*s8h2)) + 180*s2h2*(-300540195*s16 + 5315213750*s4h4 - 20580*s4*(-96577*s12 + 335412*s6h2) - 7283776500*s4h2_s8 + 99099*(18088*s10_s6 + 8775*s8h2))))/4.70975640135e11
 
-                fs = [f0, f2, f4, f6, f8, f10, f12, f14, f16, f18, f20, f0p, f2p, f4p, f6p, f8p, f10p, f12p, f14p, f16p, f18p, f20p]        
+                new_fs = [f0, f2, f4, f6, f8, f10, f12, f14, f16, f18, f20, f0p, f2p, f4p, f6p, f8p, f10p, f12p, f14p, f16p, f18p, f20p]        
 
         else:
 
                 raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
 
-        return fs
+        return new_fs
 
 def SkipSpline_B1617(ss, z, indeces, opts):
 
@@ -301,13 +297,13 @@ def SkipSpline_B1617(ss, z, indeces, opts):
         Implements equation (B.16) and (B.17) from arXiv:1708.06177v1 for a subset of points to speed up the calculation.
 
         INPUT:
-        ss:     List containing all figure function arrays according to arXiv:1708.06177v1.
-        z:      See ToF_Algorithm().
-        indeces:   Array where B1617() is actually computed.
-        opts:   See ToF_Algorithm().
+        ss:             List containing all figure function arrays according to arXiv:1708.06177v1.
+        z:              See Algorithm().
+        indeces:        Array where B1617() is actually computed.
+        opts:           See Algorithm().
 
         OUTPUT:
-        new_fs:     List containing all NEW coefficients arrays according to arXiv:1708.06177v1.
+        new_fs:         List containing all NEW coefficients arrays according to arXiv:1708.06177v1.
         """
 
         #Skip:
@@ -331,16 +327,17 @@ def B9(fs, z, rho, rho_bar, opts):
         Implements equation (B.9) from arXiv:1708.06177v1.
 
         INPUT:
-        z:      See ToF_Algorithm()
-        rho:    See ToF_Algorithm()
-        fs:     See B1617()
-        opts:   See ToF_Algorithm().
+        fs:             See B1617().
+        z:              See Algorithm().
+        rho:            See Algorithm().
+        rho_bar:        See Algorithm().
+        opts:           See Algorithm().
 
         OUTPUT:
-        new_SS: List containing all NEW dimensionless volume integral arrays according to arXiv:1708.06177v1.
+        new_SS:         List containing all NEW dimensionless volume integral arrays according to arXiv:1708.06177v1.
         """
 
-        #Initialize parameters:
+        #Initialize relevant variables:
         N       = len(z) - 1
         new_SS  = []
 
@@ -369,22 +366,23 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
         ssarray:        Array containing all figure function arrays according to arXiv:1708.06177v1.
         SSarray:        Array containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
         m_rot:          Rotational parameter as defined in arXiv:1708.06177v1.
-        z:              Array with normalized mean levels surfaces l 
-        opts:           See ToF_Algorithm().
+        z:              Array with normalized mean levels surfaces l.
+        opts:           See Algorithm().
 
         OUTPUT:
-        new_sn0:        Array containing all NEW figure function arrays according to arXiv:1708.06177v1, except for s0.
+        new_ss_no_0:    Array containing all NEW figure function arrays according to arXiv:1708.06177v1, except for s0.
         """
 
+        #Initialize relevant variables:
         m = m_rot
         alpha0  = opts['alphas'][0]; alpha2  = opts['alphas'][1]; alpha4  = opts['alphas'][2];  alpha6  = opts['alphas'][3]
         alpha8  = opts['alphas'][4]; alpha10 = opts['alphas'][5]; alpha12 = opts['alphas'][6];  alpha14 = opts['alphas'][7]
         alpha16 = opts['alphas'][8]; alpha18 = opts['alphas'][9]; alpha20 = opts['alphas'][10]; alpha22 = opts['alphas'][11]
 
+        #Calculate As:
         if opts['H'] != 0:
                 
-                print('H unequal to zero is not yet implemented!')
-                raise NotImplementedError
+                raise NotImplementedError(c.WARN + 'H unequal to zero is not yet implemented!' + c.ENDC)
 
         if opts['order'] == 4:
 
@@ -422,7 +420,7 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
                         A8 += (-56*alpha0*m*(5*s2_s4 + 11*s6))/2145. + (16*alpha2*m*(27*s2h2 + 35*s4)*zh2)/6435. + (32*alpha4*m*(s2*(-38 + 185*s2) + 165*s4)*zh4)/40755. + (16*alpha6*m*(95 + 4*s2*(-560 + 2127*s2) + 5760*s4)*zh6)/611325. + (128*m*zh8*(12473625*alpha8*(161 + s2*(-2530 + 9353*s2) + 4960*s4) + 675840*alpha22*(6475 - 94720*s2 + 574372*s2h2 + 94560*s4)*zh14 + 74*zh2*(67425*alpha10*(575 + 6*s2*(-1300 + 5017*s2) + 12780*s4) + 28*zh2*(13485*alpha12*(7*s2*(-230 + 951*s2) + 5*(25 + 462*s4)) + 4*zh2*(3255*alpha14*(145 - 1856*s2 + 8296*s2h2 + 2400*s4) + 16*alpha16*(27*s2*(-15190 + 73523*s2) + 35*(899 + 13932*s4))*zh2 + 800*zh4*(alpha18*(651 + 6*s2*(-1460 + 7641*s2) + 9720*s4) + 220*alpha20*(3 + 3*s2*(-14 + 79*s2) + 44*s4)*zh2))))))/4.9107825892125e13
 
-                new_sn0 = np.array((A2/S0, A4/S0, A6/S0, A8/S0)).T
+                new_ss_no_0 = np.array((A2/S0, A4/S0, A6/S0, A8/S0)).T
 
         elif opts['order'] == 7:
 
@@ -478,7 +476,7 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
                         A14 += (-2*alpha0*m*(676039*s12 + 33*(8398*s10_s2 + 3234*s6h2 + 6825*s4_s8)))/5.014575e6 + (8*alpha2*m*(46189*s10 + 9*(420*s2h3_s4 + 2450*s2_s4h2 + 2772*s2h2_s6 + 5390*s4_s6 + 6435*s2_s8))*zh2)/5.014575e6 + (16*alpha4*m*(1072071*s10 - 50220*s2h4 + 23976*s2h5 + 577800*s2h3_s4 - 2520*s2h2*(155*s4 - 593*s6) - 5*(37975*s4h2 - 338310*s4_s6 + 39897*s8) + 5*s2*(268100*s4h2 - 85932*s6 + 397683*s8))*zh4)/1.55451825e8 + (128*alpha6*m*(8592870*s10 - 1767150*s2h4 + 538650*s2h5 + 315*s2h3*(2046 + 40231*s4) - 462*s2h2*(20175*s4 - 48209*s6) - 55*(61250*s4h2 - 7161*s6 - 325752*s4_s6 + 49764*s8) + 105*s2*(11935*s4 + 192910*s4h2 - 71918*s6 + 201982*s8))*zh6)/8.549850375e9 + (256*m*zh8*(138101528565*alpha8*(32210750*s10 - 16631244*s2h4 + 5245776*s2h5 + 5670*s2h3*(1452 + 18497*s4) - 315*s2h2*(3069 + 223985*s4 - 436785*s6) + 12375*s2*(1057*s4 + 10024*s4h2 - 3675*s6 + 8142*s8) - 175*(2387*s4 + 115623*s4h2 - 19635*s6 - 475020*s4_s6 + 76890*s8)) + 54742948260*alpha10*(83777625*s10 - 89228127*s2h4 + 38734026*s2h5 + 9*s2h3*(5227656 + 59601461*s4) - 315*s2h2*(26455 + 999222*s4 - 1741010*s6) - 75*(979538*s4h2 - 63*s4*(-666 + 54475*s6) - 555*(343*s6 - 996*s8)) + 5*s2*(12706281*s4 + 96897136*s4h2 + 9*(8029 - 3719240*s6 + 7148735*s8)))*zh2 + 331775444*alpha12*(13974518250*s10 - 27753859068*s2h4 + 16939293318*s2h5 + 30*s2h3*(475483633 + 5384405814*s4) - 45*s2h2*(65362017 + 1824576778*s4 - 2951892370*s6) + 50*s2*(332454213*s4 + 2294392861*s4h2 - 441*(-9361 + 1670435*s6 - 2915185*s8)) - 25*(634005365*s4h2 - 2646*s4*(-14837 + 753495*s6) + 9*(12617 - 14418530*s6 + 34566070*s8)))*zh4 + 9959488*alpha14*(465468003000*s10 - 1608436882260*s2h4 + 1305631772016*s2h5 + 780*s2h3*(995630306 + 11626797465*s4) - 360*s2h2*(470266966 + 11171308991*s4 - 17097358425*s6) + 25*(-26050955888*s4h2 + 504*s4*(-3983642 + 150351675*s6) + 33579*(-407 + 160780*s6 - 336560*s8)) + 100*s2*(7875258885*s4 + 52080330910*s4h2 + 126*(1163539 - 122792745*s6 + 199558905*s8)))*zh6 + 4608*zh8*(141*alpha16*(7088013182250*s10 - 40329352143201*s2h4 + 41205087869352*s2h5 + 2970*s2h3*(6072401391 + 74089310767*s4) - 3465*s2h2*(1145308268 + 24842743159*s4 - 36336648623*s6) + 175*s2*(91568568069*s4 + 598676814046*s4h2 - 99*(-22048078 + 1660761093*s6 - 2553070982*s8)) - 1925*(6158716796*s4h2 - 27*s4*(-20191639 + 625509594*s6) - 301*(4199589*s6 - 481*(41 + 16506*s8)))) + 470*alpha18*(2104095418425*s10 - 18820798434768*s2h4 + 23206147340904*s2h5 + 330*s2h3*(23533903612 + 301063962699*s4) - 4950*s2h2*(339982209 + 7004791606*s4 - 9854159392*s6) + 125*s2*(48697227810*s4 + 320564271014*s4h2 - 693*(-1971034 + 117525944*s6 - 172692919*s8)) - 770*(5345172440*s4h2 - 270*s4*(-1916381 + 51826680*s6) + 9*(848003 - 119072375*s6 + 207854500*s8)))*zh2 + 484*zh4*(5*alpha20*(403382978075*s10 - 5452267558122*s2h4 + 7866710590398*s2h5 + 66*s2h3*(31482780001 + 422211893166*s4) - 495*s2h2*(883607473 + 17709026882*s4 - 24067020810*s6) + 5*s2*(289324089054*s4 + 1938997277594*s4h2 - 693*(-13092038 + 658694190*s6 - 931966035*s8)) - 175*(5189290304*s4h2 - 198*s4*(-2685909 + 66067540*s6) - 423*(-22919 + 2380510*s6 - 3896585*s8))) + 8*alpha22*(248500231650*s10 - 4905227213568*s2h4 + 8095366057878*s2h5 + 1485*s2h3*(1166007114 + 16367391077*s4) - 990*s2h2*(354893616 + 7024206379*s4 - 9253276165*s6) - 1925*(745749 + 330437650*s4h2 - 61667055*s6 - 324*s4*(-108194 + 2490785*s6) + 95718420*s8) + 25*s2*(43125339411*s4 + 296272821622*s4h2 - 64759678830*s6 + 1782*(820526 + 49777635*s8)))*zh2))))/8.265231840526769e21
 
-                new_sn0 = np.array((A2/S0,A4/S0,A6/S0,A8/S0,A10/S0,A12/S0,A14/S0)).T
+                new_ss_no_0 = np.array((A2/S0,A4/S0,A6/S0,A8/S0,A10/S0,A12/S0,A14/S0)).T
         
         elif opts['order'] == 10:
     
@@ -552,52 +550,53 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
                         A20 += (-380*alpha0*m*s18)/1443. - (1292*alpha0*m*(930465*s16_s2 + 724500*s14_s4 + 644644*s12_s6 + 613470*s10_s8))/1.1487210735e10 + (8*alpha2*m*(300540195*s16 + 361049400*s14_s2 + 146024424*s12_s2h2 + 19953648*s10_s2h3 + 283936380*s12_s4 + 232792560*s10_s2*s4 + 3001250*s4h4 + 256071816*s10_s6 + 40748400*s2_s4h2*s6 + 23051952*s2h2_s6h2 + 89646480*s4_s6h2 + 48648600*s2h2_s4*s8 + 94594500*s4h2_s8 + 214053840*s2_s6*s8 + 124227675*s8h2)*zh2)/3.4461632205e10 + (16*alpha4*m*(9685150155*s16 - 3488361240*s12_s2 - 2860022880*s10_s2h2 + 12182810640*s12_s2h2 + 4274281440*s10_s2h3 + 4457400*s14*(-387 + 3865*s2) - 2780577800*s10_s4 + 13782377700*s12_s4 + 19800008800*s10_s2*s4 - 23405760*s2h5_s4 - 455112000*s2h3_s4h2 + 115290000*s2h4_s4h2 - 884940000*s2_s4h3 + 1149540000*s2h2_s4h3 + 681712500*s4h4 + 12478906440*s10_s6 - 257463360*s2h4_s6 + 50839488*s2h5_s6 - 3003739200*s2h2_s4*s6 + 2549232000*s2h3_s4*s6 - 1946868000*s4h2_s6 + 9104004000*s2_s4h2*s6 - 2202742080*s2_s6h2 + 5064444000*s2h2_s6h2 + 7788765600*s4_s6h2 - 1195365600*s2h3_s8 + 742238640*s2h4_s8 - 4648644000*s2_s4*s8 + 10651726800*s2h2_s4*s8 + 8195187000*s4h2_s8 - 2556754200*s6_s8 + 18278900640*s2_s6*s8 + 6059549925*s8h2)*zh4)/1.481850184815e12 + (256*alpha6*m*(3529926495*s16 + 417086670*s10_s2 - 3121258140*s10_s2h2 + 4269040776*s10_s2h3 + 8777160*s2h6 - 3615840*s2h7 - 3201768*s2h8 + 37145*s14*(-29000 + 225001*s2) - 2254752500*s10_s4 + 13623800190*s10_s2*s4 + 170667000*s2h4_s4 - 176904000*s2h5_s4 - 61508160*s2h6_s4 + 497778750*s2h2_s4h2 - 1336230000*s2h3_s4h2 + 344263500*s2h4_s4h2 + 129053750*s4h3 - 1483475000*s2_s4h3 + 2280153750*s2h2_s4h3 + 728875000*s4h4 + 29393*s12*(4945 - 95060*s2 + 281098*s2h2 + 226030*s4) + 6021654639*s10_s6 + 375467400*s2h3_s6 - 746172000*s2h4_s6 + 37499112*s2h5_s6 + 876090600*s2_s4*s6 - 4978449000*s2h2_s4*s6 + 4577844600*s2h3_s4*s6 - 2179422000*s4h2_s6 + 9867705750*s2_s4h2*s6 + 160616610*s6h2 - 2440829160*s2_s6h2 + 5375158488*s2h2_s6h2 + 5311831770*s4_s6h2 + 522972450*s2h2_s8 - 1954052100*s2h3_s8 + 1100518650*s2h4_s8 + 338963625*s4_s8 - 5140535400*s2_s4*s8 + 11303471025*s2h2_s4*s8 + 5586446250*s4h2_s8 - 2078556480*s6_s8 + 12584997810*s2_s6*s8 + 2924906985*s8h2)*zh6)/7.409250924075e12 + (512*m*zh8*(624438034345125*alpha8*(-249070188605*s14 + 622040384875*s16 + 1866798437175*s14_s2 - 6930445536*s2h5 + 14102650800*s2h6 - 1082162592*s2h7 - 8261307936*s2h8 - 44919554400*s2h3_s4 + 183782163600*s2h4_s4 - 143220253680*s2h5_s4 - 83738597040*s2h6_s4 - 37432962000*s2_s4h2 + 394787169000*s2h2_s4h2 - 865982350800*s2h3_s4h2 + 318403675800*s2h4_s4h2 + 80040765000*s4h3 - 707502327000*s2_s4h3 + 1315568856000*s2h2_s4h3 + 275120300000*s4h4 + 1547*s12*(38599925 - 511868493*s2 + 1551363363*s2h2 + 937181550*s4) + 143*s10*(-7783491870*s2h2 + 11620469844*s2h3 + 3150*s2*(456229 + 8715996*s4) - 35*(1305566 + 127488393*s4 - 262761885*s6)) - 42352722720*s2h2_s6 + 295215490080*s2h3_s6 - 457615348848*s2h4_s6 + 24046107120*s2h5_s6 - 20588129100*s4_s6 + 539084397600*s2_s4*s6 - 2353993578720*s2h2_s4*s6 + 2606718471840*s2h3_s4*s6 - 780757072200*s4h2_s6 + 3857334301800*s2_s4h2*s6 + 80006427270*s6h2 - 877581843264*s2_s6h2 + 2122689657312*s2h2_s6h2 + 1489025439720*s4_s6h2 - 24579705150*s2_s8 + 318735897480*s2h2_s8 - 902281842000*s2h3_s8 + 593803246032*s2h4_s8 + 168596453025*s4_s8 - 1847029753800*s2_s4*s8 + 4461933663180*s2h2_s4*s8 + 1565160445800*s4h2_s8 - 588823912215*s6_s8 + 3628952894952*s2_s6*s8 + 638911388115*s8h2) + 27752801526450*alpha10*(-6847383557700*s14 + 14431671048375*s16 + 53169102180810*s14_s2 + 170167189500*s2h4 - 937106755200*s2h5 + 1274591823120*s2h6 + 105609588480*s2h7 - 974505254184*s2h8 + 441174195000*s2h2_s4 - 4933529370000*s2h3_s4 + 14170046121000*s2h4_s4 - 10853854426800*s2h5_s4 - 6329019700080*s2h6_s4 + 85783871250*s4h2 - 3442754700000*s2_s4h2 + 24990384746250*s2h2_s4h2 - 54638156265000*s2h3_s4h2 + 30381410886750*s2h4_s4h2 + 4150495387500*s4h3 - 34867376775000*s2_s4h3 + 77815564942500*s2h2_s4h3 + 11539938025000*s4h4 + 1638*s12*(1352551195 - 15879058250*s2 + 52099703546*s2h2 + 24453964095*s4) + 330*s10*(-134383271022*s2h2 + 229615512687*s2h3 + 77*s2*(351160641 + 5387195510*s4) - 35*(38141064 + 1791816598*s4 - 3145692825*s6)) + 194116645800*s2_s6 - 3870021078000*s2h2_s6 + 18463653054000*s2h3_s6 - 28018204830000*s2h4_s6 + 4970956609080*s2h5_s6 - 1612850778000*s4_s6 + 27982755801000*s2_s4*s6 - 116578567413000*s2h2_s4*s6 + 158399456153400*s2h3_s4*s6 - 30520527345000*s4h2_s6 + 169456264708500*s2_s4h2*s6 + 3477909557430*s6h2 - 34847976378600*s2_s6h2 + 95535340244190*s2h2_s6h2 + 50121086469300*s4_s6h2 + 40966175250*s8 - 1911500791200*s2_s8 + 16462187903700*s2h2_s8 - 44285086929600*s2h3_s8 + 36957513681000*s2h4_s8 + 7323711491250*s4_s8 - 73309055589000*s2_s4*s8 + 200927154388950*s2h2_s4*s8 + 52653324339000*s4h2_s8 - 19111455441540*s6_s8 + 126486870810300*s2_s6*s8 + 17653021213905*s8h2)*zh2 + 890464220100*alpha12*(-242703940262630*s14 + 454749620550225*s16 + 2007043953604690*s14_s2 - 2228559933600*s2h3 + 27222118723800*s2h4 - 96973453296720*s2h5 + 115266829134600*s2h6 + 12278751396912*s2h7 - 101795251501944*s2h8 - 2166655491000*s2_s4 + 61458154758000*s2h2_s4 - 441945893188800*s2h3_s4 + 1139365876849200*s2h4_s4 - 974133991167480*s2h5_s4 - 381892469278320*s2h6_s4 + 10560346046250*s4h2 - 266210697753000*s2_s4h2 + 1702249572523500*s2h2_s4h2 - 3958303486737600*s2h3_s4h2 + 3127497213147450*s2h4_s4h2 + 236459638415000*s4h3 - 2025160786649000*s2_s4h3 + 5359489256394000*s2h2_s4h3 + 594284170480000*s4h4 + 3097094*s12*(30726395 - 349274305*s2 + 1260881543*s2h2 + 473211135*s4) + 34034*s10*(-64239343773*s2h2 + 126314892440*s2h3 + 15*s2*(865133269 + 11988488828*s4) - 385*(1984857 + 64437221*s4 - 101266395*s6)) - 366664775400*s6 + 23772745596600*s2_s6 - 298250709676920*s2h2_s6 + 1251293095132080*s2h3_s6 - 2018805148976616*s2h4_s6 + 745857237157032*s2h5_s6 - 108317658348900*s4_s6 + 1609054639592400*s2_s4*s6 - 6871376300148360*s2h2_s4*s6 + 11302819875547200*s2h3_s4*s6 - 1454327111036800*s4h2_s6 + 9142189417361000*s2_s4h2*s6 + 170973143351010*s6h2 - 1697980999314600*s2_s6h2 + 5289081674913036*s2h2_s6h2 + 2160393589874520*s4_s6h2 + 4461798691350*s8 - 128228214564450*s2_s8 + 948584855648430*s2h2_s8 - 2619497199118800*s2h3_s8 + 2752949017372554*s2h4_s8 + 359852263120350*s4_s8 - 3571956390202200*s2_s4*s8 + 11154109733807040*s2h2_s4*s8 + 2271046560732950*s4h2_s8 - 779887944165330*s6_s8 + 5642455411593000*s2_s6*s8 + 644755110784785*s8h2)*zh4 + 64*zh6*(323100225*alpha14*(-11399847682583360*s14 + 19581547776290500*s16 + 101498465929660800*s14_s2 + 18455261950125*s2h2 - 468677815105500*s2h3 + 3518087958259875*s2h4 - 10553695636564080*s2h5 + 12390093980163900*s2h6 + 247811359431636*s2h7 - 11414331375380505*s2h8 + 4784697542625*s4 - 411070692532500*s2_s4 + 7073563320573750*s2h2_s4 - 42548635343214000*s2h3_s4 + 107881227703274025*s2h4_s4 - 107820454071810480*s2h5_s4 - 13647979812894570*s2h6_s4 + 1084663909704375*s4h2 - 22426902505507500*s2_s4h2 + 138118123181288250*s2h2_s4h2 - 350087399796907500*s2h3_s4h2 + 366518688259077900*s2h4_s4h2 + 16255266114587500*s4h3 - 146441797049957500*s2_s4h3 + 453384091712842500*s2h2_s4h3 + 39228015415640625*s4h4 + 19059040*s12*(268680373 - 3082930500*s2 + 12273834216*s2h2 + 3778735695*s4) - 63024481119600*s6 + 2439327824858925*s2_s6 - 25162646249490750*s2h2_s6 + 101725822833670035*s2h3_s6 - 179925618706003170*s2h4_s6 + 105787326234982392*s2h5_s6 - 8029683677515500*s4_s6 + 112293630591842700*s2_s4*s6 - 506435254093969200*s2h2_s4*s6 + 987480145175179740*s2h3_s4*s6 - 88348852847755500*s4h2_s6 + 628116228352722375*s2_s4h2*s6 + 10350620423693550*s6h2 - 105666932146475700*s2_s6h2 + 371597353375591035*s2h2_s6h2 + 122182249884952950*s4_s6h2 + 170170*s10*(-10119117008 - 813034871376*s2h2 + 1825230224286*s2h3 - 263634859920*s4 + 30*s2*(5303245508 + 70204043497*s4) + 381606352575*s6) + 411261444594000*s8 - 9548583900055200*s2_s8 + 66714237207317700*s2h2_s8 - 195120305347607640*s2h3_s8 + 250700413808344500*s2h4_s8 + 21780194167982250*s4_s8 - 222507459322948800*s2_s4*s8 + 787390948990696050*s2h2_s4*s8 + 128778159376366500*s4h2_s8 - 41409316109561400*s6_s8 + 328988535127352100*s2_s6*s8 + 31554977786882550*s8h2) + 34874310*alpha16*(-112204309892875200*s14 + 180231451771070700*s16 - 15198451017750*s2 + 1079232411490833600*s14_s2 + 832203556309125*s2h2 - 12484855951618050*s2h3 + 75552512379844500*s2h4 - 211482690665205960*s2h5 + 261212359360352400*s2h6 - 34798966365341178*s2h7 - 229026539072094192*s2h8 + 198816946453125*s4 - 9965412260929125*s2_s4 + 136701083950806375*s2h2_s4 - 759820791633853950*s2h3_s4 + 1977224582559926700*s2h4_s4 - 2320947284222016450*s2h5_s4 + 338602053912877755*s2h6_s4 + 18806098620684375*s4h2 - 353156347530236250*s2_s4h2 + 2185520979671552250*s2h2_s4h2 - 6085723979564065200*s2h3_s4h2 + 7990513767746669250*s2h4_s4h2 + 220240639640896875*s4h3 - 2119398932056833000*s2_s4h3 + 7570080989809569000*s2h2_s4h3 + 529981434226606250*s4h4 + 272432160*s12*(204905155 - 2424800865*s2 + 10615445473*s2h2 + 2741935185*s4) + 2432430*s10*(-734472005064*s2h2 + 1861693536448*s2h3 + 280*s2*(488980809 + 6373187114*s4) - 35*(255871704 + 5793601343*s4 - 7862260239*s6)) - 1393697958327675*s6 + 42427014466862025*s2_s6 - 398452908328179705*s2h2_s6 + 1620188541494432910*s2h3_s6 - 3167596640555759412*s2h4_s6 + 2575453242883370850*s2h5_s6 - 112354601038529850*s4_s6 + 1549391985503762400*s2_s4*s6 - 7474081231143252810*s2h2_s4*s6 + 16928866349633417760*s2h3_s4*s6 - 1093853054080311525*s4h2_s6 + 8751454419918927150*s2_s4h2*s6 + 125287809039092700*s6h2 - 1338360462839758050*s2_s6h2 + 5268747457104756660*s2h2_s6h2 + 1433894327495974575*s4_s6h2 + 6471914057809200*s8 - 134788108841486100*s2_s8 + 930943671297559920*s2h2_s8 - 2919414315121143840*s2h3_s8 + 4453607333538050688*s2h4_s8 + 263715088837350150*s4_s8 - 2824647985316757600*s2_s4*s8 + 11232305291378611440*s2h2_s4*s8 + 1518200253081111600*s4h2_s8 - 454359480330605850*s6_s8 + 3960286869309170400*s2_s6*s8 + 325215665428603950*s8h2)*zh2 + 683810*alpha18*(25837366730175 - 5973411359339424000*s14 + 9095745579042622500*s16 - 3845561559840000*s2 + 62054559142676100000*s14_s2 + 120843166804009650*s2h2 - 1412934718534138800*s2h3 + 7659853109115852645*s2h4 - 21066901147017245520*s2h5 + 28186015518474733062*s2h6 - 8901463648911223104*s2h7 - 21439110393254480355*s2h8 + 26690600701264500*s4 - 1031226708366855000*s2_s4 + 12540112813982754000*s2h2_s4 - 67678048581856713000*s2h3_s4 + 184559873980118757120*s2h4_s4 - 251658603249879763080*s2h5_s4 + 101523367515485627712*s2h6_s4 + 1553388838539788250*s4h2 - 27900541831256640000*s2_s4h2 + 177454296897934042350*s2h2_s4h2 - 542931419436929031600*s2h3_s4h2 + 858553492631799453450*s2h4_s4h2 + 15465496684791825000*s4h3 - 160131173331507525000*s2_s4h3 + 651071675558565865800*s2h2_s4h3 + 38033256573526325125*s4h4 + 5789183400*s12*(556064800 - 6864706688*s2 + 32890113058*s2h2 + 7267435875*s4) + 48648600*s10*(-2507071424286*s2h2 + 7097175797947*s2h3 + 35625*s2*(12401585 + 161965746*s4) - 105*(275388848 + 5687456770*s4 - 7321584165*s6)) - 132239759516865000*s6 + 3527386086326602500*s2_s6 - 31743481336351785000*s2h2_s6 + 132712033658387683500*s2h3_s6 - 286481118063627887400*s2h4_s6 + 297119562861445424100*s2h5_s6 - 7949280805035570000*s4_s6 + 110895902277368040000*s2_s4*s6 - 574911900136028259000*s2h2_s4*s6 + 1486648928686094586000*s2h3_s4*s6 - 71750916420542730000*s4h2_s6 + 641644136761329607500*s2_s4h2*s6 + 7939550295816504750*s6h2 - 89533068653997360000*s2_s6h2 + 391279371823535450850*s2h2_s6h2 + 90212350904040456000*s4_s6h2 + 489621295648485000*s8 - 9648451986673500000*s2_s8 + 67508850828649230000*s2h2_s8 - 227853623429283852000*s2h3_s8 + 402900205015467759600*s2h4_s8 + 16729712340946605000*s4_s8 - 189623840666239980000*s2_s4*s8 + 839795248937505861000*s2h2_s4*s8 + 96090159209636970000*s4h2_s8 - 26671341567172302000*s6_s8 + 254233707214874310000*s2_s6*s8 + 18163488666621548250*s8h2)*zh4 + 968*zh6*(183*alpha20*(510283440883125 - 23777348767762590000*s14 + 34660228968621506250*s16 - 42659695657829250*s2 + 266259792364594938000*s14_s2 + 1018506205232641125*s2h2 - 10351252197362226150*s2h3 + 53063923055752258650*s2h4 - 147528989908394544450*s2h5 + 216044680014996492075*s2h6 - 109348171344462314628*s2h7 - 126538997876181225660*s2h8 + 208362119329113750*s4 - 6928402732745744250*s2_s4 + 78889101056651135250*s2h2_s4 - 425031492481101405900*s2h3_s4 + 1226665785593209893750*s2h4_s4 - 1914255065102312437830*s2h5_s4 + 1231059415448846709180*s2h6_s4 + 8827414248412134375*s4h2 - 156261627369767624250*s2_s4h2 + 1034200389010338459000*s2h2_s4h2 - 3465287549125515704500*s2h3_s4h2 + 6406638490798928286775*s2h4_s4h2 + 78718902735028316250*s4h3 - 879268967111386152000*s2_s4h3 + 4019754010898840182500*s2h2_s4h3 + 200987450065419053750*s4h4 + 98034300*s12*(139411704160 - 1806302850450*s2 + 9422188224828*s2h2 + 1810917712835*s4) + 851350500*s10*(-716922668589*s2h2 + 2244641276868*s2h3 + 3*s2*(39689763917 + 525047517740*s4) - 5*(1534336241 + 29832875935*s4 - 36731782885*s6)) - 818082069586031250*s6 + 20224126839129963750*s2_s6 - 179545194278781581250*s2h2_s6 + 780806582291961225000*s2h3_s6 - 1852399820924681096250*s2h4_s6 + 2329967265393158322750*s2h5_s6 - 40134288364489068750*s4_s6 + 574927827080851912500*s2_s4*s6 - 3205732960017420052500*s2h2_s4*s6 + 9329039966882743695000*s2h3_s4*s6 - 346324125343368506250*s4h2_s6 + 3436260810083256330000*s2_s4h2*s6 + 36730995493954521375*s6h2 - 439079478770070573750*s2_s6h2 + 2114011966821489982800*s2h2_s6h2 + 421024721099191413750*s4_s6h2 + 2566859824691662500*s8 - 49367051643777367500*s2_s8 + 354804492933733342500*s2h2_s8 - 1288622407026844890000*s2h3_s8 + 2591610789358713622500*s2h4_s8 + 77549482605507412500*s4_s8 - 934121259806184450000*s2_s4*s8 + 4568571648527566680000*s2h2_s4*s8 + 451511728262597625000*s4h2_s8 - 116036610462881608500*s6_s8 + 1204723694634210828000*s2_s6*s8 + 75874212913187563875*s8h2) + 4*alpha22*(68480037766515375 - 1111919788232004024000*s14 + 1563016867726028715000*s16 - 4266160650645894000*s2 + 13384484460016488409500*s14_s2 + 86533124148264994200*s2h2 - 809253003448230541200*s2h3 + 4047808459087227424590*s2h4 - 11560759173802257859440*s2h5 + 18549785335052024765712*s2h6 - 12881990355443978099760*s2h7 - 6714355612334108926473*s2h8 + 16417724799002026500*s4 - 497894270882420412000*s2_s4 + 5481949525153571269800*s2h2_s4 - 29974259918467696431600*s2h3_s4 + 91919357134298538144300*s2h4_s4 - 161826648722071695442080*s2h5_s4 + 140375239227781262785080*s2h6_s4 + 555896561547927600000*s4h2 - 9881080386821071974000*s2_s4h2 + 68512957603233087426300*s2h2_s4h2 - 250238965837753190298000*s2h3_s4h2 + 529063911271865708313120*s2h4_s4h2 + 4598458979365190457000*s4h3 - 55400275737924073236000*s2_s4h3 + 281683175948319183885000*s2h2_s4h3 + 12307462115136151160750*s4h4 + 42014700*s12*(16042825939245 - 218795869328780*s2 + 1236235340130418*s2h2 + 209630468528010*s4) + 1158300*s10*(-30446837705073132*s2h2 + 104545978399186020*s2h3 + 1610*s2*(2958250886919 + 39913594547893*s4) - 35*(8545325210208 + 159886937396204*s4 - 189430787787795*s6)) - 54324639722062710000*s6 + 1286826279831825232500*s2_s6 - 11471391272817499023000*s2h2_s6 + 52207023027301049407500*s2h3_s6 - 135348199106771388137400*s2h4_s6 + 199602091382789366271000*s2h5_s6 - 2300944017058546860000*s4_s6 + 34150276076387790690000*s2_s4*s6 - 204552546621691531284000*s2h2_s4*s6 + 662027163593842906398000*s2h3_s4*s6 - 19389206969135373510000*s4h2_s6 + 211881407977889979682500*s2_s4h2*s6 + 1960374585494746228500*s6h2 - 24880212988427706008400*s2_s6h2 + 131078545298442616379400*s2h2_s6h2 + 22922283045953432232000*s4_s6h2 + 149988990135724740000*s8 - 2870323610360005800000*s2_s8 + 21359731609767868317000*s2h2_s8 - 83312708204091888522000*s2h3_s8 + 187752535947156433710600*s2h4_s8 + 4150726915974541402500*s4_s8 - 53207111642539474620000*s2_s4*s8 + 285175239018739467898500*s2h2_s4*s8 + 24754928110187474115000*s4h2_s8 - 5888351704013110332000*s6_s8 + 66303262038404497768200*s2_s6*s8 + 3721697441227985719500*s8h2)*zh2))))/1.5221573493067348e30
 
-                new_sn0 = np.array((A2/S0,A4/S0,A6/S0,A8/S0,A10/S0,A12/S0,A14/S0,A16/S0,A18/S0,A20/S0)).T
+                new_ss_no_0 = np.array((A2/S0,A4/S0,A6/S0,A8/S0,A10/S0,A12/S0,A14/S0,A16/S0,A18/S0,A20/S0)).T
 
         else:
 
                 raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
 
-        return new_sn0
+        return new_ss_no_0
 
-def SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts, returnAs=False):
+def SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts):
 
         """
         Implements equation (B.12)-(B.15) from arXiv:1708.06177v1 for a subset of points to speed up the calculation.
 
         INPUT:
-        ss:     List containing all figure function arrays according to arXiv:1708.06177v1.
-        SS:     List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
-        m_rot:  Rotational parameter as defined in arXiv:1708.06177v1.
-        z:      See ToF_Algorithm().
-        indeces:   Array where B1215() is actually computed.
-        opts:   See ToF_Algorithm().
+        ss:             List containing all figure function arrays according to arXiv:1708.06177v1.
+        SS:             List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
+        m_rot:          Rotational parameter as defined in arXiv:1708.06177v1.
+        z:              See Algorithm().
+        indeces:        Array where B1215() is actually computed.
+        opts:           See Algorithm().
 
         OUTPUT:
-        ss:     List containing all NEW figure function arrays according to arXiv:1708.06177v1.
+        ss:             List containing all NEW figure function arrays according to arXiv:1708.06177v1.
         """
 
         #Skip:
-        S_skip  = np.array([S[indeces] for S in SS]).T                     #with shape corresponding to [number of points, index n]
-        s_skip  = np.array([s[indeces] for s in ss]).T                     #with shape corresponding to [number of points, index n]
+        S_skip          = np.array([S[indeces] for S in SS]).T                  #with shape corresponding to [number of points, index n]
+        s_skip          = np.array([s[indeces] for s in ss]).T                  #with shape corresponding to [number of points, index n]
 
-        new_sn0 = B1215(s_skip, S_skip, m_rot, z[indeces], opts)      #with shape corresponding to [number of points, index n]
+        new_ss_no_0     = B1215(s_skip, S_skip, m_rot, z[indeces], opts)        #with shape corresponding to [number of points, index n]
        
+        #Calculate the NEW s0:
         if opts['order'] == 4:
 
-                s2 = new_sn0[:,0]; s4 = new_sn0[:,1]
+                s2 = new_ss_no_0[:,0]; s4 = new_ss_no_0[:,1]
 
                 new_s0 = (-6*s2**3 - 35*s4**2 - 9*s2**2*(7 + 2*s4))/315.
 
         elif opts['order'] == 7:
 
-                s2 = new_sn0[:,0]; s4 = new_sn0[:,1]; s6 = new_sn0[:,2]
+                s2 = new_ss_no_0[:,0]; s4 = new_ss_no_0[:,1]; s6 = new_ss_no_0[:,2]
 
                 new_s0  = (s2**2*(-11025 - 1050*s2 + s2**3*(-210 + 127*s2)))/55125. - (2*s2**2*(105 + s2**2*(21 + 4*s2))*s4)/3675. - ((1155 + 300*s2 + 82*s2**3)*s4**2)/10395. - (6*s4**3)/1001. - (10*s4*(9*s2 + 2*s4)*s6)/1287. - ((55 + 14*s2)*s6**2)/715.
 
         elif opts['order'] == 10:
 
-                s2 = new_sn0[:,0]; s4 = new_sn0[:,1]; s6 = new_sn0[:,2]; s8 = new_sn0[:,3]; s10 = new_sn0[:,4]
+                s2 = new_ss_no_0[:,0]; s4 = new_ss_no_0[:,1]; s6 = new_ss_no_0[:,2]; s8 = new_ss_no_0[:,3]; s10 = new_ss_no_0[:,4]
 
                 new_s0  = (842*s2**9)/3.472875e6 - (16*s2**7*s4)/18375. - (2*s2**5*(7 + 4*s4))/3675. + (s2**8*(749 + 1270*s4))/1.929375e6 + s2**6*(0.0023038548752834466 - (4*s4**2)/6237.) + (s2**4*(377*s4**2 + 11025*s6**2 - 126*s4*(429 + 100*s6)))/4.729725e6 - (2*s2**3*(765765 + 17*(8340*s4**3 + 33075*s4*s6 + 12726*s6**2 + 35*s4**2*(533 + 580*s6)) + 407484*s6*s8))/8.0405325e7 + (s2**2*(-106135029 - 4005540*s4**3 + 504781*s4**4 - 12474*s4*(2431 + 285*s6**2) - 48510*s4**2*(34*s6 + 49*s8)))/5.30675145e8 - (2*s2*(1889550*s4**2 + 209950*s4**4 + 4578525*s4*s6 + 508725*s4**3*s6 + 81*(15827*s6**2 + 40964*s6*s8 + 429*s8*(75*s10 + 28*s8))))/1.30945815e8 + (-17442*s4**3 - 1938*s4**5 - 8400*s6**3 - 63*s6**2*(3553 + 350*s8) - 133*s4**2*(2431 + 340*s6 + 490*s8) - 8151*(17*s10**2 + 21*s8**2) - 252*s4*(133*s6**2 + 99*s8**2 + 7*s6*(55*s10 + 36*s8)))/2.909907e6
 
@@ -605,30 +604,27 @@ def SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts, returnAs=False):
 
                 raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
 
-        new_s0 = np.reshape(new_s0, (new_s0.size,1))    #with shape corresponding to [number of points, index 0]
+        new_s0          = np.reshape(new_s0, (new_s0.size, 1))                  #with shape corresponding to [number of points, index 0]
 
-        new_ss = np.hstack((new_s0,new_sn0))
+        #Combine everything into one variable:
+        new_ss_temp     = np.hstack((new_s0, new_ss_no_0))
 
         #Spline:
-        ss = []
+        new_ss          = []                                                    #with shape corresponding to [index n, number of points]
 
         if len(indeces) < len(z):
 
                 for i in range(opts['order']+1):
 
-                        ss.append(scipy.interpolate.interp1d(z[indeces], new_ss[:,i], 'cubic', fill_value='extrapolate')(z))
+                        new_ss.append(scipy.interpolate.interp1d(z[indeces], new_ss_temp[:,i], 'cubic', fill_value='extrapolate')(z))
 
         else:
 
                 for i in range(opts['order']+1):
 
-                        ss.append(new_ss[:,i])
-
-        if returnAs:
-
-                return np.array(ss)[1:,:]*SS[0]
-
-        return ss #with shape corresponding to [index n, number of points]
+                        new_ss.append(new_ss_temp[:,i])
+        
+        return new_ss
 
 #Calculate the Js based on the Ss:
 def B111(ss, SS, R_m_to_R_ref, opts):
@@ -640,27 +636,33 @@ def B111(ss, SS, R_m_to_R_ref, opts):
         ss:             List containing all figure function arrays according to arXiv:1708.06177v1.
         SS:             List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
         R_m_to_R_ref:   Float containing the ratio of the outermost level surface to the reference radius.
-        opts:           See ToF_Algorithm().
+        opts:           See Algorithm().
 
         OUTPUT:
-        Js:     Array containing all gravitational harmonics calculated according to arXiv:1708.06177v1.
+        Js:             Array containing all gravitational harmonics calculated according to arXiv:1708.06177v1.
+        R_eq_to_R_m:    Float containing the ratio of the equatorial radius to the mean outer level surface.
+        R_po_to_R_m:    Float containing the ratio of the polar radius to the mean outer level surface.
         """
 
+        #Calculate R_eq_to_R_m and R_po_to_R_m:
         if opts['order'] == 4:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]
+
                 R_eq_to_R_m = 1 + s0 - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
                 R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8
 
         elif opts['order'] == 7:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]; s10 = ss[5][-1]; s12 = ss[6][-1]; s14 = ss[7][-1]
+
                 R_eq_to_R_m = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. - s2/2. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
                 R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8 + s10 + s12 + s14
 
         elif opts['order'] == 10:
 
                 s0 = ss[0][-1]; s2 = ss[1][-1]; s4 = ss[2][-1]; s6 = ss[3][-1]; s8 = ss[4][-1]; s10 = ss[5][-1]; s12 = ss[6][-1]; s14 = ss[7][-1]; s16 = ss[8][-1]; s18 = ss[9][-1]; s20 = ss[10][-1]
+
                 R_eq_to_R_m = 1 + s0 - (63*s10)/256. + (231*s12)/1024. - (429*s14)/2048. + (6435*s16)/32768. - (12155*s18)/65536. - s2/2. + (46189*s20)/262144. + (3*s4)/8. - (5*s6)/16. + (35*s8)/128.
                 R_po_to_R_m = 1 + s0 + s2 + s4 + s6 + s8 + s10 + s12 + s14 + s16 + s18 + s20
         
@@ -668,15 +670,19 @@ def B111(ss, SS, R_m_to_R_ref, opts):
 
                 raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
 
+        #Sanity check:
+        assert R_eq_to_R_m >= 1., c.WARN + "Equatorial radius is smaller than mean outer level surface!" + c.ENDC
+        assert R_po_to_R_m <= 1., c.WARN + "Polar radius is bigger than mean outer level surface!" + c.ENDC
+
+        #Intialize gravitational moment storage:
         Js = []
 
+        #Calculate gravitational moments:
         for i in range(opts['order']+1):
 
                 Js.append(-(R_m_to_R_ref**(2*i))*SS[i][-1])
 
-        Js = np.array(Js)
-
-        return Js, R_eq_to_R_m, R_po_to_R_m
+        return np.array(Js), R_eq_to_R_m, R_po_to_R_m
 
 #Calculate A0 based on the fs and the Ss:
 def B4(ss, SS, m_rot, z, opts):
@@ -688,22 +694,23 @@ def B4(ss, SS, m_rot, z, opts):
         ss:         List containing all figure function arrays according to arXiv:1708.06177v1.
         SS:         List containing all dimensionless volume integral arrays according to arXiv:1708.06177v1.
         m_rot:      Rotational parameter as defined in arXiv:1708.06177v1.
-        z:          Array with normalized mean levels surfaces l 
-        opts:       See ToF_Algorithm().
+        z:          Array with normalized mean levels surfaces l.
+        opts:       See Algorithm().
 
         OUTPUT:
         A0:         Array containing the total potential calculated according to arXiv:1708.06177v1.
         """
-    
+        
+        #Initialize relevant variables:
         m = m_rot
         alpha0  = opts['alphas'][0]; alpha2  = opts['alphas'][1]; alpha4  = opts['alphas'][2];  alpha6  = opts['alphas'][3]
         alpha8  = opts['alphas'][4]; alpha10 = opts['alphas'][5]; alpha12 = opts['alphas'][6];  alpha14 = opts['alphas'][7]
         alpha16 = opts['alphas'][8]; alpha18 = opts['alphas'][9]; alpha20 = opts['alphas'][10]; alpha22 = opts['alphas'][11]
 
+        #Calculate A0:
         if opts['H'] != 0:
 
-                print('H unequal to zero is not yet implemented!')
-                raise NotImplementedError
+                raise NotImplementedError(c.WARN + 'H unequal to zero is not yet implemented!' + c.ENDC)
 
         if opts['order'] == 4:
 

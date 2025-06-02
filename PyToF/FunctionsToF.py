@@ -6,9 +6,6 @@ import numpy as np
 import scipy
 import time
 
-import matplotlib.pyplot as plt
-import matplotlib
-
 import PyToF.AlgoToF as AlgoToF
 from PyToF.color import c
 
@@ -24,7 +21,7 @@ def _mass_int(class_obj):
 def _fixradius(class_obj):
 
     """
-    Renormalizes the level surfaces class_obj.li for consistency with the initially provided equatorial radius.
+    Renormalizes the level surfaces class_obj.li for consistency with the initially provided physical radius.
     """
 
     #Renormalize the level surfaces in such a way that the newly calculated R_calc equatorial radius is the same as the initial one:
@@ -45,9 +42,9 @@ def _fixradius(class_obj):
 
     else:
 
-        raise KeyError(c.WARN + 'Invalid R_phys type specification!' + c.ENDC)
+        raise KeyError(c.WARN + 'Invalid R_phys type specification! Valid options: \'equatorial\', \'mean\', \'polar\'' + c.ENDC)
 
-    assert np.isclose(class_obj.R_calc, class_obj.opts['R_phys'][0])
+    assert np.isclose(class_obj.R_calc, class_obj.opts['R_phys'][0]), c.WARN + 'Renormalizing the level surfaces for consistency with the initially provided physical radius failed!' + c.ENDC
 
     #Update the mass:
     class_obj.M_calc    = _mass_int(class_obj)
@@ -58,12 +55,17 @@ def _fixmass(class_obj):
     Renormalizes the densities class_obj.rhoi for consistency with the initially provided mass.
     """
 
+    #Sanity check:
+    assert np.isclose(class_obj.M_calc, _mass_int(class_obj)), c.WARN + 'PyToF forgot to update M_calc!' + c.ENDC
+
     #Renormalize the densities in such a way that...
     class_obj.rhoi      = class_obj.rhoi*class_obj.opts['M_phys']/class_obj.M_calc
 
     #...the newly calculated M_calc mass is the same as the initial one:
     class_obj.M_calc   = _mass_int(class_obj)
-    assert np.isclose(class_obj.M_calc, class_obj.opts['M_phys'])
+
+    #Sanity check:
+    assert np.isclose(class_obj.M_calc, class_obj.opts['M_phys']), c.WARN + 'Renormalizing the densities for consistency with the initially provided mass failed!' + c.ENDC
 
 def _fixrot(class_obj):
 
@@ -74,11 +76,19 @@ def _fixrot(class_obj):
     #We update the m_rot_calc parameter such that it is consistent with the period, the outermost level surface and the calculated mass:
     class_obj.m_rot_calc = (2*np.pi/class_obj.opts['Period'])**2*class_obj.li[0]**3/(class_obj.opts['G']*class_obj.M_calc)
 
-def _pressurize(class_obj):
+def _pressurize(class_obj, fixradius=True, fixmass=True):
 
     """
     Calculates the pressure class_obj.Pi at the level surfaces class_obj.li assuming hydrostatic equilibrium.
     """
+
+    if fixradius:
+
+        _fixradius(class_obj)
+
+    if fixmass:
+
+        _fixmass(class_obj)
 
     #Initialize the pressure boundary condition:
     class_obj.Pi[0] = class_obj.opts['P0']
@@ -109,12 +119,13 @@ def _update_densities(class_obj, fixradius=True, fixmass=True, fixrot=True):
     i.e. class_obj.rhoi = class_obj.barotrope(class_obj.Pi, class_obj.baro_param_calc).
     """
 
+    #Ensure that the barotrope has an argument in case it needs one:
     if class_obj.baro_param_calc is None:
 
         class_obj.baro_param_calc = class_obj.opts['baro_param_init']
 
     #Call _pressurize() and set the new densities:
-    _pressurize(class_obj)
+    _pressurize(class_obj, fixradius=fixradius, fixmass=fixmass)
     class_obj.rhoi = class_obj.barotrope(class_obj.Pi, class_obj.baro_param_calc)
 
     #Check for unphysical density inversions:
@@ -123,6 +134,7 @@ def _update_densities(class_obj, fixradius=True, fixmass=True, fixrot=True):
         raise Exception(c.WARN + 'Barotrope created density inversion!' + c.ENDC)
 
     if fixradius:
+
         _fixradius(class_obj)
 
     if fixmass:
@@ -133,10 +145,12 @@ def _update_densities(class_obj, fixradius=True, fixmass=True, fixrot=True):
 
         _fixrot(class_obj)
 
-    #Optional: use the provided atmospheric model:
+    #Optional, use a provided atmospheric model:
     if class_obj.opts['use_atmosphere']:
 
         _apply_atmosphere(class_obj)
+
+#TODO BELOW HERE:
 
 def _apply_atmosphere(class_obj, baro=True):
 
@@ -286,7 +300,6 @@ def relax_to_shape(class_obj, fixradius=True, fixmass=True, fixrot=True, pressur
 
     #Save results, flipped since AlgoToF uses a different ordering logic:
     class_obj.A0            = out.A0
-    class_obj.As            = out.As
     class_obj.ss            = out.ss
     class_obj.SS            = out.SS
     class_obj.R_eq_to_R_m   = out.R_eq_to_R_m

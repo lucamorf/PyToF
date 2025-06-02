@@ -10,8 +10,7 @@ from PyToF.color import c
 class ToF:
 
     """
-    This class contains standard routines when using the Theory of Figures for planets.
-    The main results produced by this class and its routines can be found in _set_IC().
+    This class contains standard routines when using the Theory of Figures.
     """
 
     def _default_opts(self, kwargs):
