@@ -46,17 +46,26 @@ def _fixradius(class_obj):
 
     assert np.isclose(class_obj.R_calc, class_obj.opts['R_phys'][0]), c.WARN + 'Renormalizing the level surfaces for consistency with the initially provided physical radius failed!' + c.ENDC
 
+    #Update the mass:
+    class_obj.M_calc    = _mass_int(class_obj)
+
 def _fixmass(class_obj):
 
     """
     Renormalizes the densities class_obj.rhoi for consistency with the initially provided mass.
     """
 
-    #Renormalize the densities in such a way that the newly calculated mass is the same as the initial one:
-    class_obj.rhoi      = class_obj.rhoi*class_obj.opts['M_phys']/_mass_int(class_obj)
+    #Sanity check:
+    assert np.isclose(class_obj.M_calc, _mass_int(class_obj)), c.WARN + 'PyToF forgot to update M_calc!' + c.ENDC
+
+    #Renormalize the densities in such a way that...
+    class_obj.rhoi      = class_obj.rhoi*class_obj.opts['M_phys']/class_obj.M_calc
+
+    #...the newly calculated M_calc mass is the same as the initial one:
+    class_obj.M_calc   = _mass_int(class_obj)
 
     #Sanity check:
-    assert np.isclose(_mass_int(class_obj), class_obj.opts['M_phys']), c.WARN + 'Renormalizing the densities for consistency with the initially provided mass failed!' + c.ENDC
+    assert np.isclose(class_obj.M_calc, class_obj.opts['M_phys']), c.WARN + 'Renormalizing the densities for consistency with the initially provided mass failed!' + c.ENDC
 
 def _fixrot(class_obj):
 
@@ -65,7 +74,7 @@ def _fixrot(class_obj):
     """
 
     #We update the m_rot_calc parameter such that it is consistent with the period, the outermost level surface and the calculated mass:
-    class_obj.m_rot_calc = (2*np.pi/class_obj.opts['Period'])**2*class_obj.li[0]**3/(class_obj.opts['G']*_mass_int(class_obj))
+    class_obj.m_rot_calc = (2*np.pi/class_obj.opts['Period'])**2*class_obj.li[0]**3/(class_obj.opts['G']*class_obj.M_calc)
 
 def _ensure_consistency(class_obj):
 
@@ -124,9 +133,6 @@ def _update_densities_barotrope(class_obj):
     #Set new densitites:
     class_obj.rhoi = class_obj.barotrope(class_obj.Pi, class_obj.baro_param_calc)
 
-    #Ensure physical mass stays unaffacted:
-    _fixmass(class_obj)
-        
     #Check for unphysical density inversions:
     if np.any(np.diff(class_obj.rhoi) < 0):
         
@@ -136,9 +142,6 @@ def _update_densities_barotrope(class_obj):
     if class_obj.opts['use_atmosphere']:
 
         _apply_atmosphere(class_obj)
-
-    #Ensure physical mass stays unaffacted:
-    _fixmass(class_obj)
        
 def _apply_atmosphere(class_obj):
 
@@ -149,10 +152,12 @@ def _apply_atmosphere(class_obj):
 
     #Define index that marks the transition from the atmosphere to the rest of the model:
     index = np.arange(class_obj.opts['N'])[class_obj.Pi > class_obj.opts['atmosphere_until']][0]
-    class_obj.atmosphere_index = max(index, class_obj.atmosphere_index) #prevent index oscillations
 
     #Adjust the densities to fit the atmosphere model:
-    class_obj.rhoi[:(class_obj.atmosphere_index+1)] = class_obj.opts['atmosphere'](class_obj.li[:(class_obj.atmosphere_index+1)], class_obj.Pi[:(class_obj.atmosphere_index+1)])
+    class_obj.rhoi[:index] = class_obj.opts['atmosphere'](class_obj.li[:index], class_obj.Pi[:index])
+
+    #Ensure mass stays unaffacted:
+    #class_obj.rhoi = class_obj.rhoi*class_obj.M_calc/_mass_int(class_obj)
 
     #Check for unphysical density inversions:
     if np.any(np.diff(class_obj.rhoi) < 0):
@@ -204,7 +209,7 @@ def get_NMoI(class_obj, N=1000):
     integrand_l_theta   = 2*np.pi * np.outer(class_obj.rhoi, np.ones_like(mu)) * r_l_mu**2*(1-mu_2D**2) * r_l_mu**2 * dr_dl #dmu dl
     integrand_l         = np.trapezoid(integrand_l_theta, mu, axis=1)
     MoI                 = np.trapezoid(integrand_l, class_obj.li)*(-1) #minus sign due to integration from outside to inside
-    NMoI                = MoI/(_mass_int(class_obj)*class_obj.li[0]**2)
+    NMoI                = MoI/(class_obj.M_calc*class_obj.li[0]**2)
 
     return NMoI
 
@@ -309,88 +314,55 @@ def relax_to_barotrope(class_obj):
     class_obj.opts['drot_tol'] and class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterBar'] is reached.
     """
 
+    #Set up iterative procedure:
+    it = 1
+
     #Measure ToF performance:
     tic = time.time()
 
-    #Call relax_to_shape() and ensure consistency for the first time:
-    relax_to_shape(class_obj, check_consistency=False, maxiter=2)
-    _ensure_consistency(class_obj)
-    IterBar = 1
-
-    #Converge on gravitational moments:
-    while IterBar < class_obj.opts['MaxIterBar']:
-
-        #Store old gravitational moment values:
-        old_Js = class_obj.Js
-
-        #Define iteration counter for density loop:
-        IterUpdate = 1
-        
-        #Converge on densities:
-        while IterUpdate < class_obj.opts['MaxIterUpdate']:
-
-            #Store old values:
-            old_rho = class_obj.rhoi
-            
-            #Call _update_densities_barotrope():
-            _update_densities_barotrope(class_obj)
-
-            #Update drho, ignore first entry to avoid possible division by zero:
-            drho = np.max(np.abs(class_obj.rhoi[1:]/old_rho[1:] - 1)) 
-
-            #Check convergence:
-            if drho < class_obj.opts['drho_tol']:
-
-                break
-
-            #Update iteration parameter:
-            IterUpdate += 1
-
-        #Warning if not converged:
-        if IterUpdate == class_obj.opts['MaxIterUpdate']:
-
-            string  = c.WARN + 'CONVERGENCE WARNING: '
-            string += c.WARN + 'drho = ' + c.NUMB + "{:.0e}".format(drho) + c.WARN + ' > ' + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol']) + c.WARN + ' = drho_tol'
-            string += c.INFO + ' after MaxIterUpdate = ' + c.NUMB + str(class_obj.opts['MaxIterUpdate']) + c.INFO + ' iterations.' + c.ENDC
-
-            print()
-            print(string)
+    while (it < class_obj.opts['MaxIterBar']):
 
         #Call relax_to_shape():
         relax_to_shape(class_obj, check_consistency=False, maxiter=2)
 
+        #Call _update_densities_barotrope():
+        _update_densities_barotrope(class_obj)
+
         #Store old values:
-        old_m  = class_obj.m_rot_calc
-        old_rho = class_obj.rhoi
+        old_Js      = class_obj.Js
+        old_m       = class_obj.m_rot_calc
+        old_rho     = class_obj.rhoi
 
         #Ensure consistency:
         _ensure_consistency(class_obj)
 
-        #Check convergence, ignore first entry for densities to avoid possible division by zero:
-        dJs     = np.max(np.abs(class_obj.Js            /old_Js - 1))
-        drot    =        np.abs(class_obj.m_rot_calc    /old_m  - 1)
-        drho    = np.max(np.abs(class_obj.rhoi[1:]/old_rho[1:]  - 1))
+        #Check convergence:
+        old_Js[old_Js==0]   = np.spacing(1) #Smallest numerically resolvable non-zero number
+        old_rho[old_rho==0] = np.spacing(1) #Smallest numerically resolvable non-zero number
+        dJs                 = np.max(np.abs(class_obj.Js            /old_Js         - 1))
+        drot                =        np.abs(class_obj.m_rot_calc    /old_m          - 1)
+        drho                = np.max(np.abs(class_obj.rhoi          /old_rho        - 1))
         
         if (drot < class_obj.opts['drot_tol'] and dJs < class_obj.opts['dJ_tol'] and drho < class_obj.opts['drho_tol']):
 
             break
 
         #Update iteration parameter:
-        IterBar += 1
+        it += 1
 
     #Measure ToF performance:
     toc = time.time()
 
     #Warning if not converged:
-    if IterBar == class_obj.opts['MaxIterBar']:
+    if it == class_obj.opts['MaxIterBar']:
 
         b1, b2, b3 = drot < class_obj.opts['drot_tol'], dJs < class_obj.opts['dJ_tol'], drho < class_obj.opts['drho_tol']
         c1, c2, c3 = c.get(b1), c.get(b2), c.get(b3)
         
         string  = c.WARN + 'CONVERGENCE WARNING: '
-        string += c1 + 'drot = ' + c.NUMB + "{:.0e}".format(drot)   + c1 + [' > ', ' < '][b1] + c.NUMB + "{:.0e}".format(class_obj.opts['drot_tol']) + c1 + ' = drot_tol'
-        string += c2 + ', dJ = ' + c.NUMB + "{:.0e}".format(dJs)    + c2 + [' > ', ' < '][b2] + c.NUMB + "{:.0e}".format(class_obj.opts['dJ_tol'])   + c2 + ' = dJ_tol'
-        string += c3 + ', drho = ' + c.NUMB + "{:.0e}".format(drho) + c3 + [' > ', ' < '][b3] + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol']) + c3 + ' = drho_tol'
+        string += c1 + 'drot_tol = ' + c.NUMB + "{:.0e}".format(drot)   + c1 + [' > ', ' < '][b1] + c.NUMB + "{:.0e}".format(class_obj.opts['drot_tol'])
+        string += c2 + ', dJ_tol = ' + c.NUMB + "{:.0e}".format(dJs)    + c2 + [' > ', ' < '][b2] + c.NUMB + "{:.0e}".format(class_obj.opts['dJ_tol'])
+        string += c3 + ', drho_tol = ' + c.NUMB + "{:.0e}".format(drho) + c3 + [' > ', ' < '][b3] + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol'])
         string += c.INFO + ' after MaxIterBar = ' + c.NUMB + str(class_obj.opts['MaxIterBar']) + c.INFO + ' iterations.' + c.ENDC
 
         print()
@@ -402,7 +374,7 @@ def relax_to_barotrope(class_obj):
         print()
         print(c.INFO + 'Relaxing to barotrope done in ' + c.NUMB + '{:.2e}'.format(toc-tic) + c.INFO + ' seconds.' + c.ENDC)
 
-    return IterBar
+    return it
 
 def relax_to_density(class_obj):
 
@@ -411,96 +383,60 @@ def relax_to_density(class_obj):
     class_obj.opts['drot_tol'] and class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterDen'] is reached.
     """
 
+    #Set up iterative procedure:
+    it = 1
+
     #Measure ToF performance:
     tic = time.time()
 
-    #Call relax_to_shape() and ensure consistency for the first time:
-    relax_to_shape(class_obj, check_consistency=False, maxiter=2)
-    _ensure_consistency(class_obj)
-    IterDen = 1
-
-    #Converge on gravitational moments:
-    while IterDen < class_obj.opts['MaxIterDen']:
-
-        #Store old gravitational moment values:
-        old_Js = class_obj.Js
-
-        #Define iteration counter for density loop:
-        IterUpdate = 1
-
-        #Converge on densities, this loop terminates after one iteration if no atmosphere is provided:
-        while IterUpdate < class_obj.opts['MaxIterUpdate']:
-
-            #Store old values:
-            old_rho = class_obj.rhoi
-            
-            #Calculates the pressure values according to hydrostatic equilibrium:
-            _pressurize(class_obj)  
-
-            #Optional, use a provided atmospheric model:
-            if class_obj.opts['use_atmosphere']:
-
-                _apply_atmosphere(class_obj)
-
-            #Ensure physical mass stays unaffacted:
-            _fixmass(class_obj)
-
-            #Update drho, ignore first entry to avoid possible division by zero:
-            drho = np.max(np.abs(class_obj.rhoi[1:]/old_rho[1:] - 1)) 
-
-            #Check convergence:
-            if drho < class_obj.opts['drho_tol']:
-
-                break
-
-            #Update iteration parameter:
-            IterUpdate += 1
-
-        #Warning if not converged:
-        if IterUpdate == class_obj.opts['MaxIterUpdate']:
-
-            string  = c.WARN + 'CONVERGENCE WARNING: '
-            string += c.WARN + 'drho = ' + c.NUMB + "{:.0e}".format(drho) + c.WARN + ' > ' + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol']) + c.WARN + ' = drho_tol'
-            string += c.INFO + ' after MaxIterUpdate = ' + c.NUMB + str(class_obj.opts['MaxIterUpdate']) + c.INFO + ' iterations.' + c.ENDC
-
-            print()
-            print(string)
+    while (it < class_obj.opts['MaxIterDen']):
 
         #Call relax_to_shape():
         relax_to_shape(class_obj, check_consistency=False, maxiter=2)
 
+        #Call _pressurize():
+        _pressurize(class_obj)
+
+        #Optional: use the provided atmospheric model:
+        if class_obj.opts['use_atmosphere']:
+
+            _apply_atmosphere(class_obj)
+
         #Store old values:
-        old_m  = class_obj.m_rot_calc
-        old_rho = class_obj.rhoi
+        old_Js      = class_obj.Js
+        old_m       = class_obj.m_rot_calc
+        old_rho     = class_obj.rhoi
 
         #Ensure consistency:
         _ensure_consistency(class_obj)
 
-        #Check convergence, ignore first entry for densities to avoid possible division by zero:
-        dJs     = np.max(np.abs(class_obj.Js            /old_Js - 1))
-        drot    =        np.abs(class_obj.m_rot_calc    /old_m  - 1)
-        drho    = np.max(np.abs(class_obj.rhoi[1:]/old_rho[1:]  - 1))
-
+        #Check convergence:
+        old_Js[old_Js==0]   = np.spacing(1) #Smallest numerically resolvable non-zero number
+        old_rho[old_rho==0] = np.spacing(1) #Smallest numerically resolvable non-zero number
+        dJs                 = np.max(np.abs(class_obj.Js            /old_Js         - 1))
+        drot                =        np.abs(class_obj.m_rot_calc    /old_m          - 1)
+        drho                = np.max(np.abs(class_obj.rhoi          /old_rho        - 1))
+        
         if (drot < class_obj.opts['drot_tol'] and dJs < class_obj.opts['dJ_tol'] and drho < class_obj.opts['drho_tol']):
 
             break
 
         #Update iteration parameter:
-        IterDen += 1
+        it          = it + 1
 
     #Measure ToF performance:
     toc = time.time()
 
     #Warning if not converged:
-    if IterDen == class_obj.opts['MaxIterDen']:
+    if it == class_obj.opts['MaxIterDen']:
 
         b1, b2, b3 = drot < class_obj.opts['drot_tol'], dJs < class_obj.opts['dJ_tol'], drho < class_obj.opts['drho_tol']
         c1, c2, c3 = c.get(b1), c.get(b2), c.get(b3)
         
-        string  = c.WARN + 'CONVERGENCE WARNING: '
-        string += c1 + 'drot = ' + c.NUMB + "{:.0e}".format(drot)   + c1 + [' > ', ' < '][b1] + c.NUMB + "{:.0e}".format(class_obj.opts['drot_tol']) + c1 + ' = drot_tol'
-        string += c2 + ', dJ = ' + c.NUMB + "{:.0e}".format(dJs)    + c2 + [' > ', ' < '][b2] + c.NUMB + "{:.0e}".format(class_obj.opts['dJ_tol'])   + c2 + ' = dJ_tol'
-        string += c3 + ', drho = ' + c.NUMB + "{:.0e}".format(drho) + c3 + [' > ', ' < '][b3] + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol']) + c3 + ' = drho_tol'
+        string  = c.WARN + 'Convergence warning: '
+        string += c1 + 'drot_tol = ' + c.NUMB + "{:.0e}".format(drot)   + c1 + [' > ', ' < '][b1] + c.NUMB + "{:.0e}".format(class_obj.opts['drot_tol'])
+        string += c2 + ', dJ_tol = ' + c.NUMB + "{:.0e}".format(dJs)    + c2 + [' > ', ' < '][b2] + c.NUMB + "{:.0e}".format(class_obj.opts['dJ_tol'])
+        string += c3 + ', drho_tol = ' + c.NUMB + "{:.0e}".format(drho) + c3 + [' > ', ' < '][b3] + c.NUMB + "{:.0e}".format(class_obj.opts['drho_tol'])
         string += c.INFO + ' after MaxIterDen = ' + c.NUMB + str(class_obj.opts['MaxIterDen']) + c.INFO + ' iterations.' + c.ENDC
 
         print()
@@ -512,4 +448,4 @@ def relax_to_density(class_obj):
         print()
         print(c.INFO + 'Relaxing to density done in ' + c.NUMB + '{:.2e}'.format(toc-tic) + c.INFO + ' seconds.' + c.ENDC)
 
-    return IterDen
+    return it

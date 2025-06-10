@@ -18,7 +18,7 @@ def default_opts():
 
         #Numerical parameters:
         opts['order']       = 4                 #Determines the Theory of Figures order used by AlgoToF. Available options: 4, 7, 10.
-        opts['n_bin']       = 1                 #Binsize for calculation speed-up, 1 means that the figure functions will be calculated for all the points supplied.
+        opts['n_bin']       = -1                #Numbers of bins for calculation speed-up, -1 or n_bin==N means that the figure functions will be calculated for all the points supplied.
         opts['tol']         = 1e-10             #Convergence criterion, determines when the iterative procedure has converged on the gravitational moment values.
         opts['maxiter']     = 100               #Maximum amount of iterations used in the algorithm, prevents unreasonable runtimes.
         opts['verbosity']   = 1                 #Higher integer numbers lead to more verbosity output in the console. 0 corresponds to no output.

@@ -21,12 +21,13 @@ class ToF:
         """
 
         opts      =    {'N':                2**10,  #Number of gridpoints, i.e. level surfaces used
-                        'nx':               -1,     #Number of points that are actually used for the calculation, -1 for all
+                        'n_bin':            -1,     #Numbers of bins for calculation speed-up, -1 or n_bin==N means that the figure functions will be calculated for all the points supplied.
                         'order':            4,      #Order of the Theory of Figures to be used
                         'dJ_tol':           1e-10,  #Relative tolerance in the iterative procedure for the Js
                         'drot_tol':         1e-10,  #Relative tolerance in the iterative procedure for the rotational parameter
                         'drho_tol':         1e-10,  #Relative tolerance in the iterative procedure for the densities
-                        'MaxIterShape':     2,      #Maximum amount of iterations in AlgoToF when calling relax_to_shape()  
+                        'MaxIterShape':     100,    #Maximum amount of iterations in AlgoToF when calling relax_to_shape()
+                        'MaxIterUpdate':    100,    #Maximum amount of iterations when using _update_densities_barotrope() or _apply_atmosphere()
                         'MaxIterBar':       100,    #Maximum amount of times relax_to_barotrope() calls relax_to_shape()
                         'MaxIterDen':       100,    #Maximum amount of times relax_to_density() calls relax_to_shape()
                         'verbosity':        0,      #Higher numbers lead to more verbosity output in the console
@@ -70,7 +71,7 @@ class ToF:
                         'atmosphere':       None,   #A function of the mean level surface and the pressure that returns the density compatible with an atmospheric model
                         'atmosphere_until': None,   #Pressure value in SI units that marks the earliest acceptable end of the atmospheric model
                         
-                        'H':                0.,     #work in progress option
+                        'H':                0.,     #work in progress
                         }
 
         #Update the standard numerical parameters with the user input provided via the kwargs
@@ -95,7 +96,6 @@ class ToF:
         - rhoi:             Array, densities at the level surfaces li 
         - Pi:               Array, pressures at the level surfaces li
         - Js:               Array, gravitational harmonics, Eq. (B.11) in arXiv:1708.06177v1
-        - M_calc            Float, calculated mass radius in SI units
         - R_calc            Float, calculated equatorial radius in SI units
         - m_rot_calc:       Float, dimensionless rotational parameter
         - ss:               List of arrays, figure functions introduced in Eq. (B.1) in arXiv:1708.06177v1
@@ -111,7 +111,6 @@ class ToF:
         self.rhoi               = np.ones(self.opts['N'])*self.opts['M_phys']/(4*np.pi/3*self.opts['R_phys'][0]**3)
         self.Pi                 = np.zeros(self.opts['N'])
         self.Js                 = np.hstack((-1, np.zeros(self.opts['order'])))
-        self.M_calc             = self.opts['M_phys']
         self.R_calc             = self.opts['R_phys'][0]
         self.m_rot_calc         = (2*np.pi/self.opts['Period'])**2*self.li[0]**3/(self.opts['G']*self.opts['M_phys'])
         self.ss                 = (self.opts['order']+1)*[np.zeros(self.opts['N'])]
@@ -121,6 +120,7 @@ class ToF:
         self.R_po_to_R_m        = 1.
         self.baro_param_calc    = self.opts['baro_param_init']
         self.dens_param_calc    = self.opts['dens_param_init']
+        self.atmosphere_index   = 0
         
     def __init__(self, **kwargs):
 

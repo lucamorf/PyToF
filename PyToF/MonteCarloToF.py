@@ -62,10 +62,7 @@ def set_check_param(class_obj, fun):
     
     """
     This function allows the user to set the function that checks the parameters for the barotrope or density function.
-    The function fun should have the form fun(param, give_atmosphere_index=False) and should:
-
-    - return True if the parameters are nonsense (i.e. out of bounds)
-    - return only the parameter specifiyng the location of the atmosphere if give_atmosphere_index==True
+    The function fun should have the form fun(param) and should return True if the parameters are nonsense (i.e. out of bounds).
     """
     
     #Set function:
@@ -97,7 +94,7 @@ def baro_cost_function(class_obj, param, return_sum=True):
     #Call relax_to_barotrope():
     try:
 
-        it = class_obj.relax_to_barotrope(fixradius=True, fixmass=True, fixrot=True, pressurize=True)
+        it = class_obj.relax_to_barotrope()
 
     except:
 
@@ -165,7 +162,7 @@ def dens_cost_function(class_obj, param, return_sum=True):
     #Call relax_to_density():
     try:
 
-        it = class_obj.relax_to_density(fixradius=True, fixmass=True, fixrot=True, pressurize=True)
+        it = class_obj.relax_to_density()
     
     except:
 
@@ -228,7 +225,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     """
 
     #Find a random set of starting parameters:
-    param_0     = np.zeros((nwalkers,len(class_obj.opts['baro_param_init'])))
+    param_0 = np.zeros((nwalkers, len(class_obj.opts['baro_param_init'])))
 
     #Set up iterative procedure:
     i = 0
@@ -236,12 +233,12 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     while i < nwalkers:
 
         #Propose a new candidate:
-        param_0[i,:]        = np.random.rand(1, len(class_obj.opts['baro_param_init'])) * class_obj.opts['baro_param_init']
+        param_0[i,:] = np.random.rand(1, len(class_obj.opts['baro_param_init'])) * class_obj.opts['baro_param_init']
 
         #Propose new candidates as long the previous one is out of bounds:
         while class_obj.check_param(param_0[i,:]):
 
-            param_0[i,:]    = np.random.rand(1, len(class_obj.opts['baro_param_init'])) * class_obj.opts['baro_param_init']
+            param_0[i,:] = np.random.rand(1, len(class_obj.opts['baro_param_init'])) * class_obj.opts['baro_param_init']
         
         #Reset to initial conditions:
         class_obj._set_IC()
@@ -252,7 +249,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         #Call relax_to_barotrope():
         try:
 
-            it = class_obj.relax_to_barotrope(fixradius=True, fixmass=True, fixrot=True, pressurize=True)
+            it = class_obj.relax_to_barotrope()
 
         except:
 
@@ -290,7 +287,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
             sampler  = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['baro_param_init']), baro_log_prob, args=[class_obj], pool=pool)
 
             #Run the Markov Chain Monte Carlo class from emcee:
-            index    = 0; autocorr = np.empty(steps); old_tau  = np.inf
+            index = 0; autocorr = np.empty(steps); old_tau = np.inf
 
             for sample in sampler.sample(param_0, iterations=steps, progress=progress):
 
@@ -312,10 +309,10 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     else:
 
         #Set up the Markov Chain Monte Carlo class from emcee:
-        sampler  = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['baro_param_init']), baro_log_prob, args=[class_obj])
+        sampler = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['baro_param_init']), baro_log_prob, args=[class_obj])
 
         #Run the Markov Chain Monte Carlo class from emcee:
-        index    = 0; autocorr = np.empty(steps); old_tau  = np.inf
+        index = 0; autocorr = np.empty(steps); old_tau = np.inf
 
         for sample in sampler.sample(param_0, iterations=steps, progress=progress):
 
@@ -347,7 +344,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     """
 
     #Find a random set of starting parameters:
-    param_0     = np.zeros((nwalkers,len(class_obj.opts['dens_param_init'])))
+    param_0 = np.zeros((nwalkers, len(class_obj.opts['dens_param_init'])))
 
     #Set up iterative procedure:
     i = 0
@@ -355,12 +352,12 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     while i < nwalkers:
 
         #Propose a new candidate:
-        param_0[i,:]        = np.random.rand(1, len(class_obj.opts['dens_param_init'])) * class_obj.opts['dens_param_init']
+        param_0[i,:] = np.random.rand(1, len(class_obj.opts['dens_param_init'])) * class_obj.opts['dens_param_init']
 
         #Propose new candidates as long the previous one is out of bounds:
         while class_obj.check_param(param_0[i,:]):
 
-            param_0[i,:]    = np.random.rand(1, len(class_obj.opts['dens_param_init'])) * class_obj.opts['dens_param_init']
+            param_0[i,:] = np.random.rand(1, len(class_obj.opts['dens_param_init'])) * class_obj.opts['dens_param_init']
         
         #Reset to initial conditions:
         class_obj._set_IC()
@@ -374,7 +371,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         #Call relax_to_density():
         try:
 
-            it = class_obj.relax_to_density(fixradius=True, fixmass=True, fixrot=True, pressurize=True)
+            it = class_obj.relax_to_density()
 
         except:
 
@@ -409,10 +406,10 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
         with Pool(processes = Ncores) as pool:
 
-            sampler  = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['dens_param_init']), dens_log_prob, args=[class_obj], pool=pool)
+            sampler = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['dens_param_init']), dens_log_prob, args=[class_obj], pool=pool)
 
             #Run the Markov Chain Monte Carlo class from emcee:
-            index    = 0; autocorr = np.empty(steps); old_tau  = np.inf
+            index = 0; autocorr = np.empty(steps); old_tau = np.inf
 
             for sample in sampler.sample(param_0, iterations=steps, progress=progress):
 
@@ -434,10 +431,10 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     else:
 
         #Set up the Markov Chain Monte Carlo class from emcee:
-        sampler  = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['dens_param_init']), dens_log_prob, args=[class_obj])
+        sampler = emcee.EnsembleSampler(nwalkers, len(class_obj.opts['dens_param_init']), dens_log_prob, args=[class_obj])
 
         #Run the Markov Chain Monte Carlo class from emcee:
-        index    = 0; autocorr = np.empty(steps); old_tau  = np.inf
+        index = 0; autocorr = np.empty(steps); old_tau = np.inf
 
         for sample in sampler.sample(param_0, iterations=steps, progress=progress):
 

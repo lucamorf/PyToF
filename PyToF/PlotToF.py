@@ -24,8 +24,8 @@ def default_opts():
 
     opts['new_figure'] = True
 
-    opts['xmargin'] = 0
-    opts['ymargin'] = 0
+    opts['xmargin'] = 0.01
+    opts['ymargin'] = 0.01
 
     opts['lw']      = 1
     opts['ls']      = '-'
@@ -44,10 +44,10 @@ def default_opts():
     opts['legend']              = False
     opts['legend_loc']          = 'best'
     opts['legend_ncol']         = 1
-    opts['legend_fontsize']     = 12
+    opts['legend_fontsize']     = 14
     opts['legend_frame_alpha']  = 0.8
 
-    opts['dpi']         = 150
+    opts['dpi']         = 100
     opts['fontsize']    = 16
     
     opts['save']        = False
