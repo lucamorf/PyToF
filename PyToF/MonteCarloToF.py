@@ -154,7 +154,7 @@ def dens_cost_function(class_obj, param, return_sum=True):
     class_obj._set_IC()
 
     #Get densities according to class_obj.density_function():
-    class_obj.rhoi = class_obj.density_function(class_obj.li, param=param)
+    class_obj.rhoi = class_obj.density_function(class_obj.li, class_obj.opts['M_phys'], param=param)
 
     #Update the internal parameters:
     class_obj.dens_param_calc = param
@@ -363,7 +363,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         class_obj._set_IC()
 
         #Get densities according to class_obj.density_function():
-        class_obj.rhoi = class_obj.density_function(class_obj.li, param=param_0[i,:])
+        class_obj.rhoi = class_obj.density_function(class_obj.li, class_obj.opts['M_phys'], param=param_0[i,:])
 
         #Update the internal parameters:
         class_obj.dens_param_calc = param_0[i,:]
