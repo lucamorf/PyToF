@@ -159,6 +159,60 @@ def _apply_atmosphere(class_obj):
 
         raise Exception(c.WARN + 'Atmosphere created density inversion!' + c.ENDC)
 
+def _get_Js_errors(class_obj):
+
+    """
+    This function is called by relax_to_shape() and fills class_obj.Js_error error estimates
+    for the gravitational moments Js calculated by the Theory of Figures based on the results
+    from PyToF_Accuracy_and_Convergence.ipynb. 
+    """
+
+    if max(abs(class_obj.opts['alphas'])) != 0 or (class_obj.opts['n_bin'] > 0 and class_obj.opts['n_bin'] != class_obj.opts['N']):
+
+        return 0
+
+    Ns              = np.array([128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768])
+    rel_error_04    = np.array([[9.55e-04, 2.11e-03, 5.80e-03, 9.10e-02], 
+                                [2.64e-04, 7.74e-04, 7.85e-03, 8.84e-02], 
+                                [7.00e-05, 3.98e-04, 8.43e-03, 8.77e-02], 
+                                [1.61e-05, 2.93e-04, 8.59e-03, 8.75e-02], 
+                                [1.28e-06, 2.64e-04, 8.64e-03, 8.73e-02], 
+                                [2.76e-06, 2.56e-04, 8.65e-03, 8.73e-02], 
+                                [3.85e-06, 2.54e-04, 8.65e-03, 8.73e-02], 
+                                [4.14e-06, 2.54e-04, 8.65e-03, 8.73e-02], 
+                                [4.22e-06, 2.54e-04, 8.65e-03, 8.73e-02]])
+    rel_error_07    = np.array([[9.60e-04, 1.85e-03, 2.84e-03, 3.83e-03, 6.85e-03, 1.82e-02, 1.59e-01], 
+                                [2.69e-04, 5.21e-04, 7.99e-04, 1.00e-03, 3.15e-03, 2.30e-02, 1.54e-01], 
+                                [7.42e-05, 1.44e-04, 2.23e-04, 2.08e-04, 2.11e-03, 2.43e-02, 1.53e-01], 
+                                [2.03e-05, 3.96e-05, 6.34e-05, 1.24e-05, 1.82e-03, 2.47e-02, 1.53e-01], 
+                                [5.52e-06, 1.07e-05, 1.94e-05, 7.28e-05, 1.74e-03, 2.48e-02, 1.52e-01], 
+                                [1.49e-06, 2.85e-06, 7.41e-06, 8.92e-05, 1.72e-03, 2.48e-02, 1.52e-01], 
+                                [4.01e-07, 7.03e-07, 3.08e-06, 1.33e-04, 1.61e-03, 2.50e-02, 1.52e-01], 
+                                [1.08e-07, 1.28e-07, 2.21e-06, 1.34e-04, 1.61e-03, 2.50e-02, 1.52e-01], 
+                                [2.94e-08, 2.64e-08, 1.97e-06, 1.34e-04, 1.61e-03, 2.50e-02, 1.52e-01]])
+    rel_error_10    = np.array([[9.60e-04, 1.85e-03, 2.83e-03, 3.92e-03, 5.14e-03, 6.51e-03, 7.50e-03, 1.49e-02, 3.97e-02, 2.23e-01], 
+                                [2.69e-04, 5.21e-04, 7.96e-04, 1.10e-03, 1.43e-03, 1.83e-03, 1.73e-03, 8.02e-03, 4.83e-02, 2.15e-01], 
+                                [7.42e-05, 1.45e-04, 2.20e-04, 3.03e-04, 3.93e-04, 5.21e-04, 1.32e-04, 6.11e-03, 5.06e-02, 2.13e-01], 
+                                [2.03e-05, 3.97e-05, 6.04e-05, 8.30e-05, 1.07e-04, 1.64e-04, 3.01e-04, 5.60e-03, 5.13e-02, 2.12e-01], 
+                                [5.52e-06, 1.08e-05, 1.64e-05, 2.24e-05, 2.32e-05, 5.00e-05, 4.53e-04, 5.40e-03, 5.15e-02, 2.12e-01], 
+                                [1.49e-06, 2.92e-06, 4.44e-06, 5.96e-06, 1.93e-06, 2.35e-05, 4.86e-04, 5.36e-03, 5.16e-02, 2.12e-01], 
+                                [4.00e-07, 7.86e-07, 1.19e-06, 1.51e-06, 3.81e-06, 1.64e-05, 4.94e-04, 5.35e-03, 5.16e-02, 2.12e-01], 
+                                [1.07e-07, 2.10e-07, 3.15e-07, 3.19e-07, 5.34e-06, 1.45e-05, 4.96e-04, 5.35e-03, 5.16e-02, 2.12e-01], 
+                                [2.85e-08, 5.61e-08, 8.43e-08, 1.07e-07, 5.43e-06, 1.46e-05, 4.96e-04, 5.35e-03, 5.16e-02, 2.12e-01]])
+
+    if class_obj.opts['order'] == 4:
+        rel_error = rel_error_04
+    elif class_obj.opts['order'] == 7:
+        rel_error = rel_error_07
+    elif class_obj.opts['order'] == 10:
+        rel_error = rel_error_10
+
+    for i,J in enumerate(class_obj.Js):
+
+        if i != 0:
+
+            class_obj.Js_error[i] = abs(J*10**scipy.interpolate.interp1d(np.log2(Ns), np.log10(rel_error[:,i-1]), bounds_error=False)(np.log2(class_obj.opts['N'])))
+
 def get_r_l_mu(class_obj, mu):
 
     """
@@ -287,6 +341,8 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter='default'):
     class_obj.SS            = out.SS #inside->outside instead of outside->inside since AlgoToF uses a different ordering logic!
     class_obj.R_eq_to_R_m   = out.R_eq_to_R_m
     class_obj.R_po_to_R_m   = out.R_po_to_R_m
+
+    _get_Js_errors(class_obj)
 
     if check_consistency:
 

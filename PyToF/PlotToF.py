@@ -16,8 +16,7 @@ from PyToF.color import c
 def default_opts():
 
     """
-    This function implements the standard parameters used for plotting,
-    except for the kwargs given by the user.
+    This function implements the standard parameters used for plotting.
     """
 
     opts = {}
@@ -457,8 +456,8 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, **kwargs):
     x_array /= 10**x_scale
     y_array /= 10**y_scale
 
-    x_label += r' [$\cdot 10^{'+str(-1*x_scale)+'}$]'
-    y_label += r' [$\cdot 10^{'+str(-1*y_scale)+'}$]'
+    x_label += r' [$\cdot 10^{'+str(x_scale)+'}$]'
+    y_label += r' [$\cdot 10^{'+str(y_scale)+'}$]'
         
     ax.scatter(x_array, y_array, color=color_list)
 

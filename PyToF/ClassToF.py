@@ -110,7 +110,8 @@ class ToF:
         self.li                 = np.linspace(1, 1/self.opts['N'], self.opts['N'])*self.opts['R_phys'][0]
         self.rhoi               = np.ones(self.opts['N'])*self.opts['M_phys']/(4*np.pi/3*self.opts['R_phys'][0]**3)
         self.Pi                 = np.zeros(self.opts['N'])
-        self.Js                 = np.hstack((-1, np.zeros(self.opts['order'])))
+        self.Js                 = np.hstack((-1,        np.zeros(self.opts['order'])))
+        self.Js_error           = np.hstack((-1, np.nan*np.zeros(self.opts['order'])))
         self.R_calc             = self.opts['R_phys'][0]
         self.m_rot_calc         = (2*np.pi/self.opts['Period'])**2*self.li[0]**3/(self.opts['G']*self.opts['M_phys'])
         self.ss                 = (self.opts['order']+1)*[np.zeros(self.opts['N'])]
@@ -121,7 +122,7 @@ class ToF:
         self.baro_param_calc    = self.opts['baro_param_init']
         self.dens_param_calc    = self.opts['dens_param_init']
         self.atmosphere_index   = 0
-        
+                
     def __init__(self, **kwargs):
 
         """
