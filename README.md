@@ -1,7 +1,7 @@
 # PyToF
 Numerical implementation of the Theory of Figures algorithm (4th, 7th, 10th order) including barotropic differential rotation.
 
-**You are free to use this code for your own work if you credit**
+**You are free to use this code for your own work if you cite**
 
 Morf, L., Müller, S., and Helled, R., "The interior of Uranus: Thermal profile, bulk composition, and the distribution of rock, water, and hydrogen and helium", <i>Astronomy and Astrophysics</i>, vol. 690, Art. no. A105, EDP, 2024. doi:10.1051/0004-6361/202450698. 
 
