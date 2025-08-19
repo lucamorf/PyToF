@@ -3,5 +3,3 @@
 ########################################################
 
 from PyToF.ClassToF import ToF
-
-from PyToF.StenOpt.ClassOpt import OptToF
