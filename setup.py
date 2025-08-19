@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="PyToF",
-    version="1.5.0",
+    version="1.4.3",
     description="numerical implementation of the Theory of Figures algorithm (4th, 7th, 10th order) including barotropic differential rotation",
     url="",
     author="Luca Morf",
