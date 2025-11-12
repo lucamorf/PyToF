@@ -532,9 +532,15 @@ def relax_to_density(class_obj):
         #Ensure consistency:
         _ensure_consistency(class_obj)
 
-        #Check convergence, ignore first entry for densities to avoid possible division by zero:
-        dJs     = np.max(np.abs(class_obj.Js            /old_Js - 1))
-        drot    =        np.abs(class_obj.m_rot_calc    /old_m  - 1)
+        #Check convergence, and address division by zero issues:
+        if old_m !=0:
+            drot = np.abs(class_obj.m_rot_calc    /old_m  - 1)
+        else:
+            drot = 0.0
+
+        mask = ~np.logical_and(class_obj.Js==0, old_Js==0)
+
+        dJs     = np.max(np.abs(class_obj.Js[mask]/old_Js[mask] - 1))
         drho    = np.max(np.abs(class_obj.rhoi[1:]/old_rho[1:]  - 1))
 
         if (drot < class_obj.opts['drot_tol'] and dJs < class_obj.opts['dJ_tol'] and drho < class_obj.opts['drho_tol']):

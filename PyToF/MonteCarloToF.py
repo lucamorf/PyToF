@@ -499,13 +499,13 @@ def classify_and_save_state(class_obj, state, what_model, what_save='none', log_
         #Save .txt file if wanted by the user:
         if what_save=='all':
 
-            if log_CGS_units:
+            if log_CGS_units and not os.path.exists(path_name + '/' + file_name + '_CGS_' + str(i) + '.txt'):
 
                 np.savetxt(path_name + '/' + file_name + '_CGS_' + str(i) + '.txt', np.transpose(np.array([ class_obj.li * 100, 
                                                                                                             np.log10(class_obj.rhoi) - 3, 
                                                                                                             np.log10(class_obj.Pi) + 1])))
 
-            else:
+            if not log_CGS_units and not os.path.exists(path_name + '/' + file_name + '_SI_' + str(i) + '.txt'):
 
                 np.savetxt(path_name + '/' + file_name + '_SI_' + str(i) + '.txt',  np.transpose(np.array([ class_obj.li, 
                                                                                                             class_obj.rhoi, 
