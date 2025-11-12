@@ -56,7 +56,7 @@ def _default_mpl_opts():
     
     #Figure properties:
     opts['figure.figsize']              = [6.4, 4.8]
-    opts['figure.dpi']                  = 100
+    opts['figure.dpi']                  = 200
     opts['font.family']                 = 'Ubuntu'
 
     return opts
