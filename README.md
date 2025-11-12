@@ -58,16 +58,19 @@ PyToF solutions: ['J_2 = 9.5477e-03 +/- 1.5e-07', 'J_4 = -1.9534e-04 +/- 5.7e-08
 
 ## Plotting capabilities
 
-Below you can find a few figures that illustrate PyToF's capabilities, in partiular when it comes to built-in plotting routines.
+Below you can find a few figures that illustrate PyToF's capabilities, in partiular when it comes to built-in plotting routines. For more, consider chapters 2 and 5 in the tutorial.
 
-X.plot_shape()
+### X.plot_shape()
+
 ![plot_shape_polar](plot_shape_polar.png "X.plot_shape()")
 ![plot_shape_cartesian](plot_shape_cartesian.png "X.plot_shape()")
 
-X.plot_state_xy()
+### X.plot_state_xy()
+
 ![plot_state_xy](plot_state_xy.png "X.plot_state_xy()")
 
-X.plot_state_xy_corr()
+### X.plot_state_xy_corr()
+
 ![plot_state_xy_corr](plot_state_xy_corr.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
