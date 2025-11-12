@@ -75,8 +75,14 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ## Accuracy and Convergence
 
-See the folder PyToF_Accuracy_and_Convergence_Images for plots that demonstrate the accuracy of PyToF when compared against 
+We demonstrate the accuracy of PyToF when compared against 
 
 Wisdom, J. and Hubbard, W. B., "Differential rotation in Jupiter: A comparison of methods", <i>Icarus</i>, vol. 267, pp. 315-322, 2016. doi:10.1016/j.icarus.2015.12.030.
 
-The plots have been generated using PyToF_Accuracy_and_Convergence.ipynb
+with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Images have been generated using PyToF_Accuracy_and_Convergence.ipynb.
+
+![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel.png)
+
+![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel.png)
+
+![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel.png)
