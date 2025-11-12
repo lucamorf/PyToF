@@ -8,7 +8,8 @@ Morf, L., Müller, S., and Helled, R., "The interior of Uranus: Thermal profile,
 ## Installation
 
 Download or clone this repository, navigate into the directory and execute
-```
+
+```console
 pip install .
 ```
 
@@ -48,13 +49,21 @@ X.plot_xy(0, 2)
 print('PyToF solutions:', ['J_'+str(2*i)   +' = ' + "{:.4e}".format(X.Js[i]) + ' +/- ' + "{:.1e}".format(X.Js_error[i]) for i in range(1,5)])
 ```
 
-and contains a minimal working example of how to obtain gravitational moments given an interior planetary profile.
+and contains a minimal working example of how to obtain gravitational moments given an interior planetary profile. Output of the above code snippet:
+
+```console
+Number of iterations used by the algorithm: 48
+PyToF solutions: ['J_2 = 9.5477e-03 +/- 1.5e-07', 'J_4 = -1.9534e-04 +/- 5.7e-08', 'J_6 = 5.1743e-06 +/- 4.4e-08', 'J_8 = -1.6401e-07 +/- 1.4e-08']
+```
 
 ## Plotting capabilities
 
 Below you can find a few figures that illustrate PyToF's capabilities, in partiular when it comes to built-in plotting routines:
 
-![plot_xy](plot_xy.png "X.plot_xy()")
+![plot_shape_polar](plot_shape_polar.png "X.plot_shape()")
+![plot_shape_cartesian](plot_shape_cartesian.png "X.plot_shape()")
+![plot_state_xy](plot_state_xy.png "X.plot_state_xy()")
+![plot_state_xy_corr](plot_state_xy_corr.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
