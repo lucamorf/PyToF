@@ -658,7 +658,7 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, lit
     #Save the plot if needed:
     if opts['do_save']:
 
-        class_obj.fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
+        fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
 
 def plot_autocorr(autocorr, **kwargs):
 
