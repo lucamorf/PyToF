@@ -62,16 +62,16 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ### X.plot_shape()
 
-![plot_shape_polar](plot_shape_polar.png "X.plot_shape()")
-![plot_shape_cartesian](plot_shape_cartesian.png "X.plot_shape()")
+![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar.png "X.plot_shape()")
+![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian.png "X.plot_shape()")
 
 ### X.plot_state_xy()
 
-![plot_state_xy](plot_state_xy.png "X.plot_state_xy()")
+![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy.png "X.plot_state_xy()")
 
 ### X.plot_state_xy_corr()
 
-![plot_state_xy_corr](plot_state_xy_corr.png "X.plot_state_xy_corr()")
+![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_xy_corr.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
@@ -81,8 +81,14 @@ Wisdom, J. and Hubbard, W. B., "Differential rotation in Jupiter: A comparison o
 
 with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Images and have been generated using PyToF_Accuracy_and_Convergence.ipynb.
 
+### Gravitational moment J2
+
 ![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel.png)
 
+### Gravitational moment J8
+
 ![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel.png)
+
+### Runtime comparison
 
 ![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel.png)

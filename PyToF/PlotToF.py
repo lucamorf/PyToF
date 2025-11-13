@@ -16,7 +16,16 @@ from PyToF.color import c
 def _default_mpl_opts():
 
     """
-    This function customises standard rcParams options for plotting.
+    Return default Matplotlib rcParams options for all plots.
+
+    These settings control visual aspects such as line width, marker size,
+    tick style, font size, and figure dimensions. They serve as a base for
+    all plotting functions in this module.
+
+    Returns
+    -------
+    dict
+        Dictionary of Matplotlib rcParams keys and default values.
     """
 
     opts = {}
@@ -64,7 +73,12 @@ def _default_mpl_opts():
 def _apply_mpl_opts(opts):
 
     """
-    This function applies _default_mpl_opts().
+    Apply Matplotlib rcParams options from a dictionary.
+
+    Parameters
+    ----------
+    opts : dict
+        Dictionary of rcParams-style key-value pairs to apply globally.
     """
 
     for kwd, value in opts.items():
@@ -80,7 +94,15 @@ def _apply_mpl_opts(opts):
 def _default_plot_xy_opts():
 
     """
-    This function implements standard paramters used for the function plot_xy().
+    Return default keyword arguments for `plot_xy()`, `plot_state_xy()`, and `plot_state_corr_xy()`.
+
+    These defaults define line appearance, legend configuration, and
+    output options for saving figures.
+
+    Returns
+    -------
+    dict
+        Dictionary of default options for `plot_xy()`, `plot_state_xy()`, and `plot_state_corr_xy()`.
     """
 
     opts = {}
@@ -107,7 +129,15 @@ def _default_plot_xy_opts():
 def _default_plot_shape_opts():
 
     """
-    This function implements standard paramters used for the function plot_shape().
+    Return default keyword arguments for `plot_shape()`.
+
+    These defaults control contour levels, color maps, and figure export
+    settings for shape visualization.
+
+    Returns
+    -------
+    dict
+        Dictionary of default options for `plot_shape()`.
     """
 
     opts = {}
@@ -130,7 +160,15 @@ def _default_plot_shape_opts():
 def _default_plot_ss():
 
     """
-    This function implements standard paramters used for the function plot_ss().
+    Return default keyword arguments for `plot_ss()`.
+
+    The returned parameters define legend and save options for plotting
+    figure functions or spherical harmonics.
+
+    Returns
+    -------
+    dict
+        Dictionary of default options for `plot_ss()`.
     """
 
     opts = {}
@@ -152,7 +190,15 @@ def _default_plot_ss():
 def _default_plot_autocorr():
 
     """
-    This function implements standard paramters used for the function plot_autocorr().
+    Return default keyword arguments for `plot_autocorr()`.
+
+    The defaults determine legend configuration and save parameters for
+    plotting integrated autocorrelation results.
+
+    Returns
+    -------
+    dict
+        Dictionary of default options for `plot_autocorr()`.
     """
 
     opts = {}
@@ -172,6 +218,28 @@ def _default_plot_autocorr():
     return opts
 
 def plot_xy(class_obj, x, y, do_new_figure=True, literature=None, inset_plot_xy=None, colorbar=None, **kwargs):
+
+    """
+    Plot selected properties of a model (for example radius vs. density).
+
+    Parameters
+    ----------
+    class_obj : object
+        PyToF object, does not need to be provided by the user, see ClassToF.py.
+    x, y : int
+        Indices selecting which quantities to plot along x and y axes.
+    do_new_figure : bool, optional
+        Whether to create a new figure, by default True.
+    literature : object, optional
+        Reference data object with attributes `lis`, `rhois`, `Pis`, etc.
+    inset_plot_xy : object, optional
+        Definition of an inset subplot with limits and axes configuration.
+    colorbar : object, optional
+        Object defining a Matplotlib colorbar, with attributes such as
+        `mappable`, `label`, `width`, `stretch`, etc.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
 
     #Apply default and user supplied options:
     mpl_opts    = {**_default_mpl_opts()    , **kwargs}; _apply_mpl_opts(mpl_opts)
@@ -276,6 +344,20 @@ def plot_xy(class_obj, x, y, do_new_figure=True, literature=None, inset_plot_xy=
 
 def plot_shape(class_obj, **kwargs):
 
+    """
+    Plot the internal density structure and shape of a rotating spheroid.
+
+    Generates both Cartesian and polar contour plots of normalized density
+    distributions based on model results.
+
+    Parameters
+    ----------
+    class_obj : object
+        PyToF object, does not need to be provided by the user, see ClassToF.py.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
+
     #Apply default and user supplied options:
     mpl_opts = {**_default_mpl_opts()       , **kwargs}; _apply_mpl_opts(mpl_opts)
     opts     = {**_default_plot_shape_opts(), **kwargs}
@@ -293,48 +375,60 @@ def plot_shape(class_obj, **kwargs):
     Z[:N,:] = np.outer(class_obj.rhoi/np.max(class_obj.rhoi), np.ones_like(theta))
 
     #Create new figure:
-    class_obj.fig, class_obj.ax  = plt.subplots(layout='constrained')
+    fig, axs  = plt.subplots(1, 2, layout='constrained', gridspec_kw={'width_ratios': [1, 0.07]})
 
     #Do the plotting:
-    con         = class_obj.ax.contourf(X, Y, Z, levels=opts['contourf_levels'], cmap=opts['contourf_cmap'])
-    con_line    = class_obj.ax.contour (X, Y, Z, levels=opts['contour_levels'], colors=opts['contour_colors'])
-    cbar        = class_obj.fig.colorbar(con, ticks=opts['colorbar_ticks'])
+    con         = axs[0].contourf(X, Y, Z, levels=opts['contourf_levels'], cmap=opts['contourf_cmap'])
+    con_line    = axs[0].contour (X, Y, Z, levels=opts['contour_levels'], colors=opts['contour_colors'])
+    cbar        = fig.colorbar(con, ticks=opts['colorbar_ticks'], cax=axs[1])
     
     #Do labeling:
-    class_obj.ax.clabel(con_line, inline=True, fontsize=opts['contour_fontsize'])
-    cbar.ax.tick_params(left=True, right=True)
+    axs[0].clabel(con_line, inline=True, fontsize=opts['contour_fontsize'])
+    cbar.ax.tick_params(left=True, right=True); cbar.ax.tick_params(which='minor', left=False, right=False)
     cbar.set_label(r'$\rho$ [$\cdot$' + str(np.round(np.max(class_obj.rhoi/1000),2)) + ' g/cm$^3$]')
-    class_obj.ax.set_yticks([0, 45, 90, 135, 180, 225, 270, 315, 360], labels=['N', 'NW', 'W', 'SW', 'S', 'SE', 'E', 'NE', 'N'])
-    class_obj.ax.set_xlabel(r'spheroid shell radius / average surface radius')
+    axs[0].set_yticks([0, 45, 90, 135, 180, 225, 270, 315, 360], labels=['N', 'NW', 'W', 'SW', 'S', 'SE', 'E', 'NE', 'N'])
+    axs[0].set_xlabel(r'spheroid shell radius / average surface radius')
     
     #Save the plot if needed:
     if opts['do_save']:
 
-        class_obj.fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '_cartesian.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
+        fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '_cartesian.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
 
     #Create new figure:
-    class_obj.fig, class_obj.ax = plt.subplots(layout='constrained', subplot_kw={'projection': 'polar'})
+    fig, axs = plt.subplots(1, 2, layout='constrained', gridspec_kw={'width_ratios': [1, 0.07]})
+    axs[0].remove(); axs[0] = fig.add_subplot(1, 2, 1, projection='polar')
 
     #Do the plotting:
-    con     = class_obj.ax.contourf(Y*(2*np.pi)/360, X, Z, levels=opts['contourf_levels'], cmap=opts['contourf_cmap'])
-    cbar    = class_obj.fig.colorbar(con, ticks=opts['colorbar_ticks'])
-    line    = class_obj.ax.plot(theta, np.ones_like(theta), color=(0.8, 0.8, 0.8, 1.0), label=r'average surface radius')
+    con     = axs[0].contourf(Y*(2*np.pi)/360, X, Z, levels=opts['contourf_levels'], cmap=opts['contourf_cmap'])
+    cbar    = fig.colorbar(con, ticks=opts['colorbar_ticks'], cax=axs[1])
+    line    = axs[0].plot(theta, np.ones_like(theta), color=(0.8, 0.8, 0.8, 1.0), label=r'average surface radius')
     
     #Do labeling:
-    cbar.ax.tick_params(left=True, right=True)
+    cbar.ax.tick_params(left=True, right=True); cbar.ax.tick_params(which='minor', left=False, right=False)
     cbar.set_label(r'$\rho$ [$\cdot$' + str(np.round(np.max(class_obj.rhoi/1000),2)) + ' g/cm$^3$]')
-    class_obj.ax.set_theta_zero_location("N")
-    class_obj.ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315, 360], labels=['N', 'NW', 'W', 'SW', 'S', 'SE', 'E', 'NE', 'N'])
-    class_obj.ax.set_rgrids([], labels=[])
-    class_obj.ax.spines['polar'].set_visible(False)
-    class_obj.ax.legend(handles=line, loc='center', bbox_to_anchor=(0.5, -0.15), borderaxespad=0, frameon=False)
+    axs[0].set_theta_zero_location("N")
+    axs[0].set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315, 360], labels=['N', 'NW', 'W', 'SW', 'S', 'SE', 'E', 'NE', 'N'])
+    axs[0].set_rgrids([], labels=[])
+    axs[0].spines['polar'].set_visible(False)
+    axs[0].legend(handles=line, loc='center', bbox_to_anchor=(0.5, -0.15), borderaxespad=0, frameon=False)
 
     #Save the plot if needed:
     if opts['do_save']:
 
-        class_obj.fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '_polar.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
+        fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '_polar.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
 
 def plot_ss(class_obj, **kwargs):
+
+    """
+    Plot normalized figure functions (spherical shape coefficients).
+
+    Parameters
+    ----------
+    class_obj : object
+        PyToF object, does not need to be provided by the user, see ClassToF.py.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
 
     #Apply default and user supplied options:
     mpl_opts = {**_default_mpl_opts(), **kwargs}; _apply_mpl_opts(mpl_opts)
@@ -372,6 +466,30 @@ def plot_ss(class_obj, **kwargs):
         class_obj.fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
 
 def plot_state_xy(class_obj, x, y, state, what_model, literature=None, inset_plot_xy=None, colorbar=None, **kwargs):
+
+    """
+    Plot selected properties of several models (for example radius vs. density).
+
+    Parameters
+    ----------
+    class_obj : object
+        PyToF object, does not need to be provided by the user, see ClassToF.py.
+    x, y : int
+        Indices selecting which quantities to plot along x and y axes.
+    state : ndarray
+        2D array of model states (rows = realizations, columns = parameters).
+    what_model : {'baro', 'dens'}
+        Specifies whether to use barotropic or density cost function.
+    literature : object, optional
+        Reference data object with attributes `lis`, `rhois`, `Pis`, etc.
+    inset_plot_xy : object, optional
+        Definition of an inset subplot with limits and axes configuration.
+    colorbar : object, optional
+        Object defining a Matplotlib colorbar, with attributes such as
+        `mappable`, `label`, `width`, `stretch`, etc.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
 
     #Apply default and user supplied options:
     mpl_opts    = {**_default_mpl_opts()    , **kwargs}; _apply_mpl_opts(mpl_opts)
@@ -444,6 +562,33 @@ def plot_state_xy(class_obj, x, y, state, what_model, literature=None, inset_plo
         plot_xy(class_obj, x, y, do_new_figure=do_new_figure_arg, literature=literature_arg, inset_plot_xy=inset_plot_xy, colorbar=colorbar, **opts)
 
 def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, literature=None, colorbar=None, **kwargs):
+
+    """
+    Plot correlations between two model quantities with marginal histograms.
+
+    Displays a scatter plot of two quantities (specified by `x`, `y`) with associated
+    error bars, marginal histograms, and Spearman correlation coefficients.
+
+    Parameters
+    ----------
+    class_obj : object
+        PyToF object, does not need to be provided by the user, see ClassToF.py.
+    x, y : int
+        Indices selecting which quantities to plot along x and y axes.
+    state : ndarray
+        2D array of model states (rows = realizations, columns = parameters).
+    what_model : {'baro', 'dens'}
+        Specifies whether to use barotropic or density cost function.
+    sigma_lim : float, optional
+        Sigma-based filtering threshold for outlier exclusion.
+    literature : object, optional
+        Reference data object with attributes `lis`, `rhois`, `Pis`, etc.
+    colorbar : object, optional
+        Object defining a Matplotlib colorbar, with attributes such as
+        `mappable`, `label`, `width`, `stretch`, etc.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
 
     #Apply default and user supplied options:
     mpl_opts    = {**_default_mpl_opts()    , 'axes.xmargin': 0.05, 'axes.ymargin': 0.05, **kwargs}; _apply_mpl_opts(mpl_opts)
@@ -599,7 +744,7 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, lit
         ax.errorbar(xa, ya, xerr=xe, yerr=ye, color=c, fmt='o')
 
     #Plot the x-data histogram:
-    bins_x = np.linspace(x_array.min(), x_array.max(), 20)
+    bins_x = np.linspace(x_array.min(), x_array.max(), 15)
     ax_histx.hist(x_array, bins=bins_x, alpha=0.5, color='black')
     counts, bin_edges = np.histogram(x_array, bins=bins_x)
     x_outline_x = np.repeat(bin_edges, 2)
@@ -607,7 +752,7 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, lit
     ax_histx.plot(x_outline_x, y_outline_x, color='black')
 
     #Plot the y-data histogram:
-    bins_y = np.linspace(y_array.min(), y_array.max(), 20)
+    bins_y = np.linspace(y_array.min(), y_array.max(), 15)
     ax_histy.hist(y_array, bins=bins_y, alpha=0.5, orientation='horizontal', color='black')
     counts, bin_edges = np.histogram(y_array, bins=bins_y)
     y_outline_y = np.repeat(bin_edges, 2)
@@ -661,6 +806,17 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, lit
         fig.savefig(opts['path_name'] + '/' + opts['fig_name'] + '.' + opts['format'], format=opts['format'], transparent=opts['transparent'])
 
 def plot_autocorr(autocorr, **kwargs):
+
+    """
+    Plot integrated autocorrelation time versus sampling length.
+
+    Parameters
+    ----------
+    autocorr : array_like
+        Array of estimated autocorrelation times for increasing step numbers.
+    **kwargs : dict
+        Additional keyword arguments to override default plot settings.
+    """
 
     #Apply default and user supplied options:
     mpl_opts    = {**_default_mpl_opts()    , 'axes.xmargin': 0.05, 'axes.ymargin': 0.05, **kwargs}; _apply_mpl_opts(mpl_opts)
