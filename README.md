@@ -62,16 +62,16 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ### X.plot_shape()
 
-![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar.png "X.plot_shape()")
-![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian.png "X.plot_shape()")
+![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_5_1.png "X.plot_shape()")
+![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_5_1.png "X.plot_shape()")
 
 ### X.plot_state_xy()
 
-![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy.png "X.plot_state_xy()")
+![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_5_1.png "X.plot_state_xy()")
 
 ### X.plot_state_xy_corr()
 
-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_xy_corr.png "X.plot_state_xy_corr()")
+![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_xy_corr_1_5_1.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
@@ -83,12 +83,12 @@ with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Imag
 
 ### Gravitational moment J2
 
-![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel.png)
+![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel_1_5_1.png)
 
 ### Gravitational moment J8
 
-![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel.png)
+![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel_1_5_1.png)
 
 ### Runtime comparison
 
-![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel.png)
+![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel_1_5_1.png)
