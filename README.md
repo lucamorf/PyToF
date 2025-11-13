@@ -71,7 +71,7 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ### X.plot_state_xy_corr()
 
-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_xy_corr_1_5_1.png "X.plot_state_xy_corr()")
+![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_5_1.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
