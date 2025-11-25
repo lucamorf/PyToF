@@ -107,7 +107,7 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
                 new_Js, R_eq_to_R_m, R_po_to_R_m = B111(ss, SS, R_m_to_R_ref, opts)
 
                 #Check for convergence to terminate:
-                mask = Js > 0
+                mask = Js == 0
                 if np.any(mask):
                         dJs = np.abs((Js[mask] - new_Js[mask])/Js[mask])
                 elif (new_Js == 0).all():

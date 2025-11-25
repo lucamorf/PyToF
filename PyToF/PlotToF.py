@@ -730,8 +730,8 @@ def plot_state_corr_xy(class_obj, x, y, state, what_model, sigma_lim=np.inf, lit
     ax.set_xlabel(x_label); ax.set_ylabel(y_label)
 
     #Apply the sigma_lim potentially supplied by the user, sigma_lim=np.inf has no effect:
-    mask_x = (x_array - np.average(x_array))**2/np.std(x_array)**2 < sigma_lim**2
-    mask_y = (y_array - np.average(y_array))**2/np.std(y_array)**2 < sigma_lim**2
+    mask_x = (x_array - np.average(x_array))**2/max(np.std(x_array)**2, np.spacing(np.average(x_array))) <= sigma_lim**2
+    mask_y = (y_array - np.average(y_array))**2/max(np.std(y_array)**2, np.spacing(np.average(y_array))) <= sigma_lim**2
     mask = np.logical_and(mask_x, mask_y)
 
     x_array = x_array[mask]; y_array = y_array[mask]; x_err = x_err[mask]; y_err = y_err[mask]
