@@ -43,9 +43,6 @@ X.m_rot_calc = (2*np.pi/period)**2*X.li[0]**3/(X.opts['G']*mass)
 
 number_of_iterations = X.relax_to_shape()
 print('Number of iterations used by the algorithm:', number_of_iterations)
-
-X.plot_xy(0, 2)
-
 print('PyToF solutions:', ['J_'+str(2*i)   +' = ' + "{:.4e}".format(X.Js[i]) + ' +/- ' + "{:.1e}".format(X.Js_error[i]) for i in range(1,5)])
 ```
 
@@ -62,16 +59,16 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ### X.plot_shape()
 
-![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_5_1.png "X.plot_shape()")
-![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_5_1.png "X.plot_shape()")
+![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_5_3.png "X.plot_shape()")
+![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_5_3.png "X.plot_shape()")
 
 ### X.plot_state_xy()
 
-![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_5_1.png "X.plot_state_xy()")
+![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_5_3.png "X.plot_state_xy()")
 
 ### X.plot_state_xy_corr()
 
-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_5_1.png "X.plot_state_xy_corr()")
+![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_5_3.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
@@ -83,12 +80,12 @@ with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Imag
 
 ### Gravitational moment J2
 
-![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel_1_5_1.png)
+![J_2_Bessel](/PyToF_Accuracy_and_Convergence_data/J_2_Bessel_1_5_3.png)
 
 ### Gravitational moment J8
 
-![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel_1_5_1.png)
+![J_8_Bessel](/PyToF_Accuracy_and_Convergence_data/J_8_Bessel_1_5_3.png)
 
 ### Runtime comparison
 
-![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel_1_5_1.png)
+![time_bessel](/PyToF_Accuracy_and_Convergence_data/time_Bessel_1_5_3.png)
