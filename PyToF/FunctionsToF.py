@@ -3,6 +3,7 @@
 ########################################################
 
 import time
+from pathlib import Path
 
 import numpy as np
 import scipy
@@ -138,25 +139,50 @@ def _pressurize(class_obj):
         * np.flip(class_obj.A0)
     )
 
-    integrand = -class_obj.rhoi * np.gradient(class_obj.U, class_obj.li)
-
-    # Do NOT use cumulative_simpson here, as it does just sum up up local
-    # simpsons, which is not equivalent to a global simpson integration:
-    class_obj.Pi = class_obj.opts["P0"] + scipy.integrate.cumulative_trapezoid(
-        integrand, x=class_obj.li, initial=0.0
+    integrand = -class_obj.rhoi * np.gradient(
+        class_obj.U, class_obj.li, edge_order=2
     )
+
+    if class_obj.opts["use_simpson"]:
+        class_obj.Pi = class_obj.opts[
+            "P0"
+        ] - scipy.integrate.cumulative_simpson(
+            integrand, x=class_obj.li[::-1], initial=0.0
+        )
+    else:
+        class_obj.Pi = class_obj.opts[
+            "P0"
+        ] + scipy.integrate.cumulative_trapezoid(
+            integrand, x=class_obj.li, initial=0.0
+        )
 
     if class_obj.opts["debug_plot"]:
         debug_FunctionsToF_plot(
             class_obj, new=False, iteration=class_obj.bugfix_iter
         )
 
+    if class_obj.opts["use_simpson"] and (
+        not (class_obj.Pi >= 0).all() or not (np.diff(class_obj.Pi) >= 0).all()
+    ):
+        class_obj.opts["use_simpson"] = False
+        if class_obj.opts["verbosity"] > 0:
+            print(
+                c.WARN
+                + "Calculated pressure contains negative or non-monotonic "
+                + "entries! Reverting to the more stable and less accurate "
+                + "trapezoid rule for integration to hopefully mitigate the "
+                + "issue."
+                + c.ENDC
+            )
+        _pressurize(class_obj)
+
     assert (class_obj.Pi >= 0).all(), (
-        c.WARN + "Calculated pressure contains negative entries!" + c.ENDC
+        c.WARN + "Calculated pressure contains negative entries! " + c.ENDC
     )
+
     assert (np.diff(class_obj.Pi) >= 0).all(), (
         c.WARN
-        + "Calculated pressure is not monotonically increasing!"
+        + "Calculated pressure is not monotonically increasing! "
         + c.ENDC
     )
 
@@ -229,109 +255,6 @@ def _apply_atmosphere(class_obj):
         )
 
 
-def _get_Js_errors(class_obj):
-    """
-    This function is called by relax_to_shape() and fills class_obj.Js_error
-    error estimates for the gravitational moments Js calculated by the Theory
-    of Figures based on the results from PyToF_Accuracy_and_Convergence.ipynb.
-    """
-
-    if max(abs(class_obj.opts["alphas"])) != 0:
-        print(
-            c.WARN
-            + "Accuracy when using differential rotation is unknown. "
-            + "PyToF provides no error estimates."
-            + c.ENDC
-        )
-        return 0
-
-    if (
-        class_obj.opts["n_bin"] > 0
-        and class_obj.opts["n_bin"] != class_obj.opts["N"]
-    ):
-        print(
-            c.WARN
-            + "Accuracy when interpolation and binning is unknown. "
-            + "PyToF provides no error estimates."
-            + c.ENDC
-        )
-        return 0
-
-    # ruff: noqa: E501
-    # fmt: off
-    Ns = np.array([128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768])
-
-    rel_error_04 = np.array(
-        [
-            [9.50e-04, 2.15e-03, 5.72e-03, 9.11e-02],
-            [2.63e-04, 7.84e-04, 7.83e-03, 8.84e-02],
-            [6.97e-05, 4.01e-04, 8.43e-03, 8.77e-02],
-            [1.60e-05, 2.94e-04, 8.59e-03, 8.75e-02],
-            [1.26e-06, 2.64e-04, 8.64e-03, 8.73e-02],
-            [2.76e-06, 2.56e-04, 8.65e-03, 8.73e-02],
-            [3.85e-06, 2.54e-04, 8.65e-03, 8.73e-02],
-            [4.14e-06, 2.54e-04, 8.65e-03, 8.73e-02],
-            [4.22e-06, 2.54e-04, 8.65e-03, 8.73e-02]
-        ]
-    )
-
-    rel_error_07 = np.array(
-        [
-            [9.55e-04, 1.89e-03, 2.92e-03, 3.96e-03, 7.03e-03, 1.80e-02, 1.60e-01],
-            [2.67e-04, 5.31e-04, 8.20e-04, 1.04e-03, 3.20e-03, 2.29e-02, 1.54e-01],
-            [7.39e-05, 1.47e-04, 2.29e-04, 2.16e-04, 2.12e-03, 2.43e-02, 1.53e-01],
-            [2.03e-05, 4.02e-05, 6.47e-05, 1.04e-05, 1.83e-03, 2.47e-02, 1.53e-01],
-            [5.51e-06, 1.09e-05, 1.97e-05, 7.23e-05, 1.75e-03, 2.48e-02, 1.52e-01],
-            [1.49e-06, 2.89e-06, 7.50e-06, 8.91e-05, 1.72e-03, 2.48e-02, 1.52e-01],
-            [4.00e-07, 7.13e-07, 3.10e-06, 1.33e-04, 1.61e-03, 2.50e-02, 1.52e-01],
-            [1.08e-07, 1.30e-07, 2.21e-06, 1.34e-04, 1.61e-03, 2.50e-02, 1.52e-01],
-            [2.93e-08, 2.58e-08, 1.97e-06, 1.34e-04, 1.61e-03, 2.50e-02, 1.52e-01]
-        ]
-    )
-
-    rel_error_10 = np.array(
-        [
-            [9.55e-04, 1.89e-03, 2.92e-03, 4.06e-03, 5.31e-03, 6.73e-03, 7.77e-03, 1.53e-02, 3.93e-02, 2.23e-01],
-            [2.67e-04, 5.31e-04, 8.17e-04, 1.13e-03, 1.47e-03, 1.88e-03, 1.80e-03, 8.10e-03, 4.82e-02, 2.15e-01],
-            [7.39e-05, 1.47e-04, 2.26e-04, 3.11e-04, 4.04e-04, 5.35e-04, 1.49e-04, 6.13e-03, 5.06e-02, 2.13e-01],
-            [2.03e-05, 4.03e-05, 6.18e-05, 8.50e-05, 1.09e-04, 1.68e-04, 2.97e-04, 5.60e-03, 5.12e-02, 2.12e-01],
-            [5.51e-06, 1.10e-05, 1.68e-05, 2.29e-05, 2.39e-05, 5.08e-05, 4.52e-04, 5.40e-03, 5.15e-02, 2.12e-01],
-            [1.49e-06, 2.96e-06, 4.52e-06, 6.08e-06, 2.10e-06, 2.37e-05, 4.85e-04, 5.36e-03, 5.16e-02, 2.12e-01],
-            [3.99e-07, 7.96e-07, 1.21e-06, 1.54e-06, 3.76e-06, 1.65e-05, 4.94e-04, 5.35e-03, 5.16e-02, 2.12e-01],
-            [1.07e-07, 2.13e-07, 3.21e-07, 3.27e-07, 5.33e-06, 1.45e-05, 4.96e-04, 5.35e-03, 5.16e-02, 2.12e-01],
-            [2.84e-08, 5.67e-08, 8.56e-08, 1.09e-07, 5.42e-06, 1.46e-05, 4.96e-04, 5.35e-03, 5.16e-02, 2.12e-01]
-        ]
-    )
-    # ruff: enable=E501
-    # fmt: on
-
-    if class_obj.opts["order"] == 4:
-        rel_error = rel_error_04
-    elif class_obj.opts["order"] == 7:
-        rel_error = rel_error_07
-    elif class_obj.opts["order"] == 10:
-        rel_error = rel_error_10
-
-    for i, J in enumerate(class_obj.Js):
-        if i != 0:
-            err_func = scipy.interpolate.interp1d(
-                np.log2(Ns), np.log10(rel_error[:, i - 1])
-            )
-            try:
-                class_obj.Js_error[i] = abs(
-                    J * 10 ** err_func(np.log2(class_obj.opts["N"]))
-                )
-            except ValueError:
-                if i == 1:
-                    print(
-                        c.WARN
-                        + "Provided number of points N outside range "
-                        + "that has been tested for accuracy. PyToF provides "
-                        + "no error estimates."
-                        + c.ENDC
-                    )
-
-
 def _print_convergence_warning_drho(class_obj, drho):
     """
     This function prints a convergence warning message if rho did not converge
@@ -385,6 +308,84 @@ def _print_convergence_warning(class_obj, drot, dJs, drho):
     )
 
     print("\n" + string)
+
+
+def get_Js_errors(class_obj):
+    """
+    This function is called by relax_to_shape() and fills class_obj.Js_error
+    error estimates for the gravitational moments Js calculated by the Theory
+    of Figures based on the results from PyToF_Accuracy_and_Convergence.ipynb.
+    """
+
+    if max(abs(class_obj.opts["alphas"])) != 0:
+        print(
+            c.WARN
+            + "Accuracy when using differential rotation is unknown. "
+            + "PyToF provides no error estimates."
+            + c.ENDC
+        )
+        return 0
+
+    if not np.allclose(np.diff(class_obj.li), np.diff(class_obj.li)[0]):
+        print(
+            c.WARN
+            + "Mean levels surfaces are not equidistant! "
+            + "Accuracy will be greatly reduced and PyToF "
+            + "provides no error estimates."
+            + c.ENDC
+        )
+        return 0
+
+    if class_obj.opts["use_simpson"]:
+        HERE = Path(__file__).resolve().parent
+        accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
+    else:
+        HERE = Path(__file__).resolve().parent
+        accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
+
+    Ns_n_bins = accuracy_data["Ns_n_bins"]
+    rel_error_04 = accuracy_data["rel_error_04"]
+    rel_error_07 = accuracy_data["rel_error_07"]
+    rel_error_10 = accuracy_data["rel_error_10"]
+
+    if class_obj.opts["order"] == 4:
+        rel_error = rel_error_04
+    elif class_obj.opts["order"] == 7:
+        rel_error = rel_error_07
+    elif class_obj.opts["order"] == 10:
+        rel_error = rel_error_10
+
+    # Negative n_bin is equivalent to n_bin = N, see AlgoToF.py:
+    if class_obj.opts["n_bin"] < 0:
+        class_obj.opts["n_bin"] = class_obj.opts["N"]
+
+    # n_bin<4 throws an error in the interpolation anyways:
+    mask = Ns_n_bins[:, 1] >= 4
+    points = Ns_n_bins[mask, :]
+
+    for i, J in enumerate(class_obj.Js):
+        if i != 0:
+            values = rel_error[:, i - 1, :].reshape(-1)[mask]
+            err_func = scipy.interpolate.LinearNDInterpolator(
+                np.log2(points), np.log10(values)
+            )
+
+            class_obj.Js_error[i] = abs(
+                J
+                * 10
+                ** err_func(
+                    np.log2(class_obj.opts["N"]),
+                    np.log2(class_obj.opts["n_bin"]),
+                )
+            )
+
+            if np.isnan(class_obj.Js_error[i]):
+                print(
+                    c.WARN
+                    + "Tuple (N, n_bin) outside range that has been tested "
+                    + "for accuracy. PyToF provides no error estimates."
+                    + c.ENDC
+                )
 
 
 def get_r_l_mu(class_obj, mu):
@@ -441,7 +442,7 @@ def get_NMoI(class_obj, N=1000):
     r_l_mu = get_r_l_mu(class_obj, mu)
 
     # Change of variables in integration:
-    dr_dl = np.gradient(r_l_mu, class_obj.li, mu)[0]
+    dr_dl = np.gradient(r_l_mu, class_obj.li, mu, edge_order=2)[0]
 
     # Perform integrations:
     integrand_l_theta = (
@@ -453,6 +454,18 @@ def get_NMoI(class_obj, N=1000):
         * r_l_mu**2
         * dr_dl
     )  # dmu dl
+
+    if (
+        not np.allclose(np.diff(class_obj.li), np.diff(class_obj.li)[0])
+        and class_obj.opts["verbosity"] > 0
+    ):
+        print(
+            c.WARN
+            + "Mean levels surfaces are not equidistant! "
+            + "NMoI integration will be inaccurate."
+            + c.ENDC
+        )
+
     integrand_l = scipy.integrate.simpson(integrand_l_theta, mu, axis=1)
     MoI = -scipy.integrate.simpson(integrand_l, class_obj.li)  # minus sign due
     # to integration from outside to inside
@@ -543,6 +556,7 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
         ss_initial=class_obj.ss,
         alphas=alphas,
         H=class_obj.opts["H"],
+        use_simpson=class_obj.opts["use_simpson"],
     )
 
     # Measure ToF performance:
@@ -566,8 +580,7 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
     # AlgoToF uses a different ordering logic!
     class_obj.R_eq_to_R_m = out.R_eq_to_R_m
     class_obj.R_po_to_R_m = out.R_po_to_R_m
-
-    _get_Js_errors(class_obj)
+    class_obj.opts["use_simpson"] = out.use_simpson
 
     if check_consistency:
         # Check equatorial radius consistency

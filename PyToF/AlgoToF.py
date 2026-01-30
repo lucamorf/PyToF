@@ -34,6 +34,8 @@ def default_opts():
     opts["debug_plot"] = False  # If True, a debug plot will be shown at each
     # iteration of the algorithm to visualise the current state of the
     # calculation, makes the code very slow.
+    opts["use_simpson"] = True  # If True, Simpson's rule will be used for
+    # the integrals, otherwise the trapezoidal rule.
     ########################
     # Physical parameters: #
     ########################
@@ -122,7 +124,8 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
         fs = SkipSpline_B1617(ss, z, indeces, opts)
 
         # Equation (B.9) from arXiv:1708.06177v1:
-        SS = B9(fs, z, rho, rho_bar, opts)
+        SS, use_simpson = B9(fs, z, rho, rho_bar, opts)
+        opts["use_simpson"] = use_simpson
 
         # Equations (B.12)-(B.15) from arXiv:1708.06177v1:
         ss = SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts)
@@ -183,6 +186,8 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
     out.SS = SS
     # Calculated total potential:
     out.A0 = B4(ss, SS, m_rot, z, opts)
+    # Whether we should continue using Simpson's rule:
+    out.use_simpson = opts["use_simpson"]
 
     return new_Js, out
 
@@ -522,16 +527,75 @@ def B9(fs, z, rho, rho_bar, opts):
     # Calculate the dimensionless volume integrals:
     integrand = z ** (2 * np.arange(opts["order"] + 1) + 3)[:, None]
     integrand *= np.array(fs[: opts["order"] + 1])
+    integrand_p = z ** (2 - 2 * np.arange(opts["order"] + 1))[:, None]
+    integrand_p *= np.array(fs[(opts["order"] + 1) :])
     domain = rho / rho_bar
 
-    # Do NOT use cumulative_simpson here, as it does just sum up up local
-    # simpsons, which is not equivalent to a global simpson integration:
-    integral = scipy.integrate.cumulative_trapezoid(
-        integrand, x=domain, initial=0, axis=-1
-    )
+    if opts["use_simpson"] and not np.allclose(np.diff(z), np.diff(z)[0]):
+        opts["use_simpson"] = False
+        if opts["verbosity"] > 0:
+            print(
+                c.WARN
+                + "Reverting to the more stable and less accurate trapezoid "
+                + "rule for integration since the radius grid is non-uniform."
+                + c.ENDC
+            )
+
+    if opts["use_simpson"]:
+        h = z[1] - z[0]
+        integral = scipy.integrate.cumulative_simpson(
+            integrand * np.gradient(domain, z, edge_order=2),
+            dx=h,
+            initial=0,
+            axis=-1,
+        )
+        integral_p = scipy.integrate.cumulative_simpson(
+            (integrand_p * np.gradient(domain, z, edge_order=2)),
+            dx=h,
+            initial=0,
+            axis=-1,
+        )
+    else:
+        integral = scipy.integrate.cumulative_trapezoid(
+            integrand, x=domain, initial=0, axis=-1
+        )
+        integral_p = scipy.integrate.cumulative_trapezoid(
+            integrand_p, x=domain, initial=0, axis=-1
+        )
 
     if opts["debug_plot"]:
-        debug_AlgoToF_plot(z, domain, integrand, fs, [integral], ["trapezoid"])
+        h = z[1] - z[0]
+        integral_simp = scipy.integrate.cumulative_simpson(
+            integrand * np.gradient(domain, z, edge_order=2),
+            dx=h,
+            initial=0,
+            axis=-1,
+        )
+        integral_p_simp = scipy.integrate.cumulative_simpson(
+            (integrand_p * np.gradient(domain, z, edge_order=2)),
+            dx=h,
+            initial=0,
+            axis=-1,
+        )
+
+        integral_trap = scipy.integrate.cumulative_trapezoid(
+            integrand, x=domain, initial=0, axis=-1
+        )
+        integral_p_trap = scipy.integrate.cumulative_trapezoid(
+            integrand_p, x=domain, initial=0, axis=-1
+        )
+
+        debug_AlgoToF_plot(
+            opts["order"],
+            z,
+            domain,
+            fs,
+            integrand,
+            integrand_p,
+            [integral_trap, integral_simp],
+            [integral_p_trap, integral_p_simp],
+            ["trapezoid", "simpson"],
+        )
 
     for i in range(opts["order"] + 1):
         assert np.isfinite(z ** -(2 * i + 3)).all(), (
@@ -544,15 +608,6 @@ def B9(fs, z, rho, rho_bar, opts):
 
         new_SS.append(rho / rho_bar * fs[i] - z ** -(2 * i + 3) * integral[i])
 
-    integrand_p = z ** (2 - 2 * np.arange(opts["order"] + 1))[:, None]
-    integrand_p *= np.array(fs[(opts["order"] + 1) :])
-
-    # Do NOT use cumulative_simpson here, as it does just sum up up local
-    # simpsons, which is not equivalent to a global simpson integration:
-    integral_p = scipy.integrate.cumulative_trapezoid(
-        integrand_p, x=domain, initial=0, axis=-1
-    )
-
     for i in range(opts["order"] + 1):
         assert np.isfinite(z ** -(2 - 2 * i)).all(), (
             c.WARN
@@ -563,18 +618,34 @@ def B9(fs, z, rho, rho_bar, opts):
         )
 
         new_SS.append(
-            -rho / rho_bar * fs[opts["order"] + 1 + i]
+            -domain * fs[opts["order"] + 1 + i]
             + z ** -(2 - 2 * i)
             * (
-                rho[N] / rho_bar * (fs[opts["order"] + 1 + i])[N]
+                domain[N] * (fs[opts["order"] + 1 + i])[N]
                 - (integral_p[i][N] - integral_p[i])
             )
         )
 
-    return new_SS
+    if opts["use_simpson"] and not np.all(np.diff(new_SS[0]) <= 0):
+        opts["use_simpson"] = False
+
+        if opts["verbosity"] > 0:
+            print(
+                c.WARN
+                + "Reverting to the more stable and less accurate trapezoid "
+                + "rule for integration since S_0, itself proportional to the "
+                + "enclosed mass function, has become non-monotonic. "
+                + "Discontinuities in the density gradient due to jumps in "
+                + "density are likely responsible."
+                + c.ENDC
+            )
+
+        return B9(fs, z, rho, rho_bar, opts)
+
+    return new_SS, opts["use_simpson"]
 
 
-# Calculate the As (except A0) based on the fs and the Ss:
+# Calculate the As (except A0) and all ss based on the fs and the Ss:
 def B1215(ssarray, SSarray, m_rot, z, opts):
     """
     Implements equation (B.12)-(B.15) from arXiv:1708.06177v1.

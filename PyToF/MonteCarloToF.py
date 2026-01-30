@@ -2,13 +2,16 @@
 # Author of this version: Luca Morf - luca.morf@uzh.ch #
 ########################################################
 
+
+import multiprocessing
 import os
-from multiprocessing import Pool
 
 import emcee
 import numpy as np
 
 from PyToF.color import c
+
+multiprocessing.set_start_method("fork", force=True)
 
 
 def _check_phys(class_obj):
@@ -294,7 +297,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
     # Do the MCMC algorithm in a parallel manner on multiple cores:
     if parallelize:
-        with Pool(processes=Ncores) as pool:
+        with multiprocessing.Pool(processes=Ncores) as pool:
             sampler = emcee.EnsembleSampler(
                 nwalkers,
                 len(class_obj.opts["baro_param_init"]),
@@ -452,7 +455,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
     # Do the MCMC algorithm in a parallel manner on multiple cores:
     if parallelize:
-        with Pool(processes=Ncores) as pool:
+        with multiprocessing.Pool(processes=Ncores) as pool:
             sampler = emcee.EnsembleSampler(
                 nwalkers,
                 len(class_obj.opts["dens_param_init"]),

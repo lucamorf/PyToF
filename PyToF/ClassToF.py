@@ -45,6 +45,8 @@ class ToF:
             # the console
             "debug_plot": False,  # If True, debug plots will be saved, makes
             # the code a lot slower
+            "use_simpson": True,  # If True, Simpson's rule will be used for
+            # pressure and AlgoToF integrals, otherwise the trapezoidal rule
             ###############################################################
             # The following numbers are taken from Wisdom & Hubbard 2016, #
             # Differential rotation in Jupiter: A comparison of methods   #
@@ -214,19 +216,22 @@ class ToF:
         )
 
         if self.opts["R_ref"] is None:
-            print(
-                c.WARN
-                + "No reference radius supplied by the user. PyToF assumes "
-                + "R_ref = R_phys."
-                + c.ENDC
-            )
             self.opts["R_ref"] = self.opts["R_phys"][0]
+
+            if self.opts["verbosity"] > 0:
+                print(
+                    c.WARN
+                    + "No reference radius supplied by the user. PyToF "
+                    + "assumes R_ref = R_phys."
+                    + c.ENDC
+                )
 
         # Set initial conditions:
         self._set_IC()
 
         # Define routines for the user:
         from PyToF.FunctionsToF import (
+            get_Js_errors,
             get_NMoI,
             get_r_l_mu,
             get_U_l_mu,
@@ -237,6 +242,8 @@ class ToF:
             set_density_function,
         )
 
+        self.get_Js_errors = functools.partial(get_Js_errors, self)
+        self.get_NMoI = functools.partial(get_NMoI, self)
         self.get_r_l_mu = functools.partial(get_r_l_mu, self)
         self.set_barotrope = functools.partial(set_barotrope, self)
         self.set_density_function = functools.partial(
@@ -246,7 +253,6 @@ class ToF:
         self.relax_to_barotrope = functools.partial(relax_to_barotrope, self)
         self.relax_to_density = functools.partial(relax_to_density, self)
         self.get_U_l_mu = functools.partial(get_U_l_mu, self)
-        self.get_NMoI = functools.partial(get_NMoI, self)
 
         from PyToF.MonteCarloToF import (
             baro_cost_function,
