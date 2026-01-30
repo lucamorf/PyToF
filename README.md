@@ -27,17 +27,27 @@ X = ClassToF.ToF()
 The most important section within this tutorial can be found at the beginning of chapter 3
 
 ```python
-N         = 2**10                                            #number of gridpoints
-n_bin     = N                                                #OPTIONAL, if n_bin < N, interpolation is used to speed up calculations but with reduced accuracy
-order     = 4                                                #OPTIONAL, 4 is fast and inaccurate; 10 is slow and accurate, 7 is an intermediate option
-density   = 1000                                             #constant density in SI units (kg/m^3)
-densities = density*np.ones(N)                               #density array in SI units (kg/m^3)
-radius    = 1e6                                              #outermost radius in SI units (m)
-radii     = radius*np.linspace(1, 1e-3, N)                   #radius array in SI units (m), arrays must start with the outer surface
-mass      = -4*np.pi*np.trapezoid(densities*radii**2, radii) #calculated mass in SI units (kg), negative sign because array starts with the outer surface
-period    = 24*60*60                                         #rotation period in SI units (s)
+N         = 2**10 #number of gridpoints
+n_bin     = N #OPTIONAL, if n_bin < N, interpolation is used to speed up
+#calculations but with reduced accuracy
+order     = 4 #OPTIONAL, 4 is fast and inaccurate; 10 is slow and accurate, 
+#7 is an intermediate option
+densities = 1000*np.ones(N) #density array in SI units (kg/m^3)
+radius    = 1e6 #outermost radius in SI units (m)
+radii     = radius*np.linspace(1, 1e-3, N) #radius array in SI units (m), 
+#arrays must start with the outer surface
+mass      = -4*np.pi*np.trapezoid(densities*radii**2, radii) #calculated mass 
+#in SI units (kg), negative sign because array starts with the outer surface
+period    = 24*60*60 #rotation period in SI units (s)
 
-X = ClassToF.ToF(N=N, M_phys=mass, R_phys=[radius, 'mean'], Period=period, order=order, n_bin=n_bin) #all radius options: 'equatorial', 'mean', 'polar'
+X = ClassToF.ToF(
+    N=N, 
+    M_phys=mass, 
+    R_phys=[radius, 'mean'], #all radius options: 'equatorial', 'mean', 'polar'
+    Period=period, 
+    order=order, 
+    n_bin=n_bin
+    ) 
 
 X.li         = radii
 X.rhoi       = densities
@@ -47,14 +57,25 @@ number_of_iterations = X.relax_to_shape()
 print('Number of iterations used by the algorithm:', number_of_iterations)
 
 X.get_Js_errors()
-print('PyToF solutions:', ['J_'+str(2*i)   +' = ' + "{:.4e}".format(X.Js[i]) + ' +/- ' + "{:.1e}".format(X.Js_error[i]) for i in range(1,5)])
+print('PyToF solutions:')
+for i in range(1,5):
+    print('J_'+str(2*i) 
+    + ' = ' 
+    + "{:.4e}".format(X.Js[i]) 
+    + ' +/- ' 
+    + "{:.1e}".format(X.Js_error[i]) 
+    )
 ```
 
 and contains a minimal working example of how to obtain gravitational moments given an interior planetary profile. Output of the above code snippet:
 
 ```console
 Number of iterations used by the algorithm: 49
-PyToF solutions: ['J_2 = 9.5477e-03 +/- 4.9e-08', 'J_4 = -1.9534e-04 +/- 4.9e-08', 'J_6 = 5.1743e-06 +/- 4.5e-08', 'J_8 = -1.6401e-07 +/- 1.4e-08']
+PyToF solutions:
+J_2 = 9.5477e-03 +/- 4.9e-08
+J_4 = -1.9534e-04 +/- 4.9e-08
+J_6 = 5.1743e-06 +/- 4.5e-08
+J_8 = -1.6401e-07 +/- 1.4e-08
 ```
 
 ## Plotting capabilities
@@ -84,18 +105,18 @@ with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Imag
 
 ### Gravitational moment J2
 
-No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff.
+No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff:
 
 ![J_2_Bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_J_2_1_6_0.png)
 
 ### Gravitational moment J8
 
-With binning and just with the results from PyToF.
+With binning and just with the results from PyToF:
 
 ![J_8_Bessel](/PyToF_Accuracy_and_Convergence_images/Binning_Bessel_J_8_1_6_0.png)
 
 ### Runtime comparison
 
-No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff.
+No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff:
 
 ![time_bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_time_1_6_0.png)
