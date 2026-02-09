@@ -337,9 +337,40 @@ def get_Js_errors(class_obj):
         return 0
 
     if class_obj.opts["use_simpson"]:
+        print(
+            c.INFO
+            + 'The option'
+            + c.ENDC
+            + ' use_simpson'
+            + c.INFO
+            + ' is' 
+            + c.NUMB
+            + ' True'
+            + c.INFO
+            + '. This ensures the highest possible accuracy.'
+            + c.ENDC
+        )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
     else:
+        print(
+            c.INFO
+            + 'The option'
+            + c.ENDC
+            + ' use_simpson'
+            + c.INFO
+            + ' is' 
+            + c.NUMB
+            + ' False'
+            + c.INFO
+            + '. This yields a reduced accuracy. PyToF may have set this'
+            + ' flag to'
+            + c.NUMB
+            + ' False'
+            + c.INFO
+            + ' without user input to mitigate stability issues.'
+            + c.ENDC
+        )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
 

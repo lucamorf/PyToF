@@ -71,6 +71,7 @@ and contains a minimal working example of how to obtain gravitational moments gi
 
 ```console
 Number of iterations used by the algorithm: 49
+The option use_simpson is True. This ensures the highest possible accuracy.
 PyToF solutions:
 J_2 = 9.5477e-03 +/- 4.9e-08
 J_4 = -1.9534e-04 +/- 4.9e-08
@@ -84,16 +85,16 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ### X.plot_shape()
 
-![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_6_0.png "X.plot_shape()")
-![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_6_0.png "X.plot_shape()")
+![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_6_1.png "X.plot_shape()")
+![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_6_1.png "X.plot_shape()")
 
 ### X.plot_state_xy()
 
-![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_6_0.png "X.plot_state_xy()")
+![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_6_1.png "X.plot_state_xy()")
 
 ### X.plot_state_xy_corr()
 
-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_6_0.png "X.plot_state_xy_corr()")
+![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_6_1.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 
@@ -107,16 +108,16 @@ with the plots that are stored in the folder PyToF_Accuracy_and_Convergence_Imag
 
 No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff:
 
-![J_2_Bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_J_2_1_6_0.png)
+![J_2_Bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_J_2_1_6_1.png)
 
 ### Gravitational moment J8
 
 With binning and just with the results from PyToF:
 
-![J_8_Bessel](/PyToF_Accuracy_and_Convergence_images/Binning_Bessel_J_8_1_6_0.png)
+![J_8_Bessel](/PyToF_Accuracy_and_Convergence_images/Binning_Bessel_J_8_1_6_1.png)
 
 ### Runtime comparison
 
 No binning and compared against Movshovitz, N. and Fortney, J. J., “The Promise and Limitations of Precision Gravity: Application to the Interior Structure of Uranus and Neptune”, <i>The Planetary Science Journal</i>, vol. 3, no. 4, Art. no. 88, IOP, 2022. doi:10.3847/PSJ/ac60ff:
 
-![time_bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_time_1_6_0.png)
+![time_bessel](/PyToF_Accuracy_and_Convergence_images/Bessel_time_1_6_1.png)

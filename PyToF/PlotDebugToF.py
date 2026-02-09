@@ -9,7 +9,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 from PyToF.color import c
 

@@ -22,6 +22,8 @@ setup(
     author_email="luca.morf@uzh.ch",
     license="Mozilla Public License Version 2.0",
     packages=find_packages(include=["PyToF", "PyToF.*"]),
+    include_package_data=True,
+    package_data={"PyToF": ["*.npz"]},
     install_requires=install_requires,
     python_requires=python_requires,
 )
