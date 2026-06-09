@@ -247,15 +247,23 @@ def debug_AlgoToF_plot(ToF_order, z, domain, fs, integrand, integrand_p, integra
     for j in range(len(integral[0])): #Is
 
         for i in range(len(integral)): #methods
-                        
+            
+            #print('z', z)
             axs[j].plot(z, integral_p[i][j], color='C0', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
-            #axs[j].plot(z, -domain*fs[ToF_order+1+i] + z**-(2-2*i) * (domain[N] * (fs[ToF_order + 1 + i])[N] - (integral_p[i][j][N] - integral_p[i][j])), color='C1', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
+            axs[j].plot(z, -domain*fs[ToF_order+1+j] + z**-(2-2*j) * (domain[N] * (fs[ToF_order + 1 + j])[N] - (integral_p[i][j][N] - integral_p[i][j])), color='C1', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
+            """
+            orange       = -domain*fs[ToF_order+1+j] + z**-(2-2*j) * (domain[N] * (fs[ToF_order + 1 + j])[N] - (integral_p[i][j][N] - integral_p[i][j]))
+            print('orange', orange)
             axs[j].plot(z, -domain*fs[ToF_order+1+j]                                                                                                    , color='C2', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
-            #print('green', -domain*fs[ToF_order+1+j] )
+            green        = -domain*fs[ToF_order+1+j]
+            print('green', green)
             axs[j].plot(z,                             z**-(2-2*j) * (domain[N] * (fs[ToF_order + 1 + j])[N]                                           ), color='C3', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
-            #print('red', z**-(2-2*j) * (domain[N] * (fs[ToF_order + 1 + j])[N]                                           ) )
-            axs[j].plot(z,                             z**-(2-2*j) * (domain[N] *                            - (integral_p[i][j][N] - integral_p[i][j])), color='C4', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
-            #print('purple', z**-(2-2*j) * (domain[N] *                            - (integral_p[i][j][N] - integral_p[i][j])) )
+            red                                      = z**-(2-2*j) * (domain[N] * (fs[ToF_order + 1 + j])[N]                                           )
+            print('red', red)
+            axs[j].plot(z,                             z**-(2-2*j) * (                                       - (integral_p[i][j][N] - integral_p[i][j])), color='C4', alpha=0.7, linestyle=linestyles[i-4*(i//4)])
+            purple                                   = z**-(2-2*j) * (                                       - (integral_p[i][j][N] - integral_p[i][j]))
+            print('purple', purple)
+            """
 
         axs[j].set_xlabel(r'$z$')
         axs[j].set_title(rf'$j={j}$', fontsize=16)
@@ -290,7 +298,7 @@ def debug_AlgoToF_plot(ToF_order, z, domain, fs, integrand, integrand_p, integra
 
     for j in range(len(integral[0])): #domains
           
-        ax.plot(z, integrand_p[j]/np.max(abs(integrand_p[j])), label=r'$z^{'+str(2*j+3)+'} f^\prime_{'+str(2*j)+'}$')
+        ax.plot(z, integrand_p[j]/np.max(abs(integrand_p[j])), label=r'$z^{'+str(2-2*j)+'} f^\prime_{'+str(2*j)+'}$')
 
     ax.set_xlabel(r'$z$')
     ax.legend()

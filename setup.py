@@ -15,7 +15,7 @@ else:
 
 setup(
     name="PyToF",
-    version="1.6.1",
+    version="1.7.0",
     description="numerical implementation of the Theory of Figures algorithm (4th, 7th, 10th order) including barotropic differential rotation",
     url="",
     author="Luca Morf",

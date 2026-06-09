@@ -232,6 +232,7 @@ class ToF:
         # Define routines for the user:
         from PyToF.FunctionsToF import (
             get_Js_errors,
+            get_Kn,
             get_NMoI,
             get_r_l_mu,
             get_U_l_mu,
@@ -244,6 +245,7 @@ class ToF:
 
         self.get_Js_errors = functools.partial(get_Js_errors, self)
         self.get_NMoI = functools.partial(get_NMoI, self)
+        self.get_Kn = functools.partial(get_Kn, self)
         self.get_r_l_mu = functools.partial(get_r_l_mu, self)
         self.set_barotrope = functools.partial(set_barotrope, self)
         self.set_density_function = functools.partial(

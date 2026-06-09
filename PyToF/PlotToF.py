@@ -25,13 +25,18 @@ def _default_mpl_opts():
 
     opts = {}
 
+    tick_major_size = 7.0
+    tick_minor_size = 4.0
+    tick_widths = 1.6
+
     # Lines and errobar:
     opts["lines.linewidth"] = 3.0
-    opts["lines.markersize"] = 9
+    opts["lines.markersize"] = 7.5
     opts["errorbar.capsize"] = 0.0
 
     # Axes and margins:
-    opts["axes.labelsize"] = 18
+    opts["axes.linewidth"] = 1.6
+    opts["axes.labelsize"] = 16
     opts["axes.xmargin"] = 0.0
     opts["axes.ymargin"] = 0.0
     opts["axes.formatter.useoffset"] = False
@@ -45,22 +50,24 @@ def _default_mpl_opts():
     opts["ytick.right"] = True
     opts["xtick.minor.visible"] = True
     opts["ytick.minor.visible"] = True
-    opts["xtick.major.size"] = 7.0
-    opts["ytick.major.size"] = 7.0
-    opts["xtick.minor.size"] = 4.0
-    opts["ytick.minor.size"] = 4.0
-    opts["xtick.major.width"] = 1.6
-    opts["ytick.major.width"] = 1.6
+    opts["xtick.major.size"] = tick_major_size
+    opts["ytick.major.size"] = tick_major_size
+    opts["xtick.minor.size"] = tick_minor_size
+    opts["ytick.minor.size"] = tick_minor_size
+    opts["xtick.major.width"] = tick_widths
+    opts["ytick.major.width"] = tick_widths
+    opts["xtick.minor.width"] = tick_widths
+    opts["ytick.minor.width"] = tick_widths
     opts["xtick.major.pad"] = 7.0
     opts["ytick.major.pad"] = 7.0
 
     # Legend:
-    opts["legend.title_fontsize"] = 16
-    opts["legend.fontsize"] = 16
+    opts["legend.title_fontsize"] = 14
+    opts["legend.fontsize"] = 14
 
     # Figure properties:
     opts["figure.figsize"] = [6.4, 4.8]
-    opts["figure.dpi"] = 200
+    opts["figure.dpi"] = 300
     if [f for f in matplotlib.font_manager.findSystemFonts() if "Ubuntu" in f]:
         opts["font.family"] = "Ubuntu"
     else:
@@ -382,7 +389,14 @@ def plot_xy(
             colorbar.mappable, cax=class_obj.cax, orientation="vertical"
         )
         cbar.set_label(colorbar.label)
-        cbar.ax.tick_params(left=True, right=True)
+        cbar.ax.tick_params(
+            which="major",
+            direction="out",
+            right=True,
+            left=False,
+            width=mpl_opts["ytick.major.width"],
+            length=mpl_opts["ytick.major.size"],
+        )
 
         if hasattr(colorbar, "tick_lab"):
             cbar.set_ticks(colorbar.tick_pos)
@@ -392,7 +406,14 @@ def plot_xy(
             if not colorbar.tick_show:
                 cbar.ax.tick_params(left=False, right=False)
 
-        cbar.ax.tick_params(which="minor", left=False, right=False)
+        cbar.ax.tick_params(
+            which="minor",
+            direction="out",
+            right=True,
+            left=False,
+            width=mpl_opts["ytick.minor.width"],
+            length=mpl_opts["ytick.minor.size"],
+        )
 
     # Do the legend if needed:
     if opts["do_legend"]:
@@ -461,14 +482,30 @@ def plot_shape(class_obj, **kwargs):
     con_line = axs[0].contour(
         X, Y, Z, levels=opts["contour_levels"], colors=opts["contour_colors"]
     )
-    cbar = fig.colorbar(con, ticks=opts["colorbar_ticks"], cax=axs[1])
+    cbar = fig.colorbar(
+        con, ticks=opts["colorbar_ticks"], cax=axs[1], pad=0.02
+    )
 
     # Do labeling:
     axs[0].clabel(con_line, inline=True, fontsize=opts["contour_fontsize"])
-    cbar.ax.tick_params(left=True, right=True)
-    cbar.ax.tick_params(which="minor", left=False, right=False)
+    cbar.ax.tick_params(
+        which="major",
+        direction="out",
+        right=True,
+        left=False,
+        width=mpl_opts["ytick.major.width"],
+        length=mpl_opts["ytick.major.size"],
+    )
+    cbar.ax.tick_params(
+        which="minor",
+        direction="out",
+        right=True,
+        left=False,
+        width=mpl_opts["ytick.minor.width"],
+        length=mpl_opts["ytick.minor.size"],
+    )
     cbar.set_label(
-        r"$\rho$ [$\cdot$"
+        r"$\rho$ ["
         + str(np.round(np.max(class_obj.rhoi / 1000), 2))
         + " g/cm$^3$]"
     )
@@ -505,7 +542,9 @@ def plot_shape(class_obj, **kwargs):
         levels=opts["contourf_levels"],
         cmap=opts["contourf_cmap"],
     )
-    cbar = fig.colorbar(con, ticks=opts["colorbar_ticks"], cax=axs[1])
+    cbar = fig.colorbar(
+        con, ticks=opts["colorbar_ticks"], cax=axs[1], pad=0.02
+    )
     line = axs[0].plot(
         theta,
         np.ones_like(theta),
@@ -514,10 +553,24 @@ def plot_shape(class_obj, **kwargs):
     )
 
     # Do labeling:
-    cbar.ax.tick_params(left=True, right=True)
-    cbar.ax.tick_params(which="minor", left=False, right=False)
+    cbar.ax.tick_params(
+        which="major",
+        direction="out",
+        right=True,
+        left=False,
+        width=mpl_opts["ytick.major.width"],
+        length=mpl_opts["ytick.major.size"],
+    )
+    cbar.ax.tick_params(
+        which="minor",
+        direction="out",
+        right=True,
+        left=False,
+        width=mpl_opts["ytick.minor.width"],
+        length=mpl_opts["ytick.minor.size"],
+    )
     cbar.set_label(
-        r"$\rho$ [$\cdot$"
+        r"$\rho$ ["
         + str(np.round(np.max(class_obj.rhoi / 1000), 2))
         + " g/cm$^3$]"
     )
@@ -572,6 +625,8 @@ def plot_ss(class_obj, **kwargs):
     # Get data for plotting:
     ss = class_obj.ss
 
+    handles = []
+    labels = []
     for i in range(len(ss)):
         if i != 0:
             x = np.append(class_obj.li / class_obj.li[0], 0)
@@ -585,11 +640,16 @@ def plot_ss(class_obj, **kwargs):
             class_obj.ax.plot(
                 x,
                 y,
-                label=(
-                    rf"${float(val):.1f}"
-                    rf" \cdot 10^{{{int(exp)}}}"
-                    rf" s_{{{2 * i}}}$"
-                ),
+            )
+            labels.append(
+                rf"${float(val):.1f}"
+                rf" \cdot 10^{{{int(exp)}}}"
+                rf" s_{{{2 * i}}}$"
+            )
+            handles.append(
+                matplotlib.patches.Patch(
+                    color=matplotlib.colors.to_rgb("C" + str(i - 1))
+                )
             )
 
     # Do the labeling:
@@ -599,6 +659,13 @@ def plot_ss(class_obj, **kwargs):
     # Do the legend if needed:
     if opts["do_legend"]:
         class_obj.ax.legend(
+            handles,
+            labels,
+            handletextpad=0.3,
+            labelspacing=0.3,
+            columnspacing=1.0,
+            handleheight=1.0,
+            handlelength=1.0,
             loc=opts["loc_legend"],
             ncol=opts["ncol_legend"],
             frameon=opts["frameon_legend"],
@@ -1058,7 +1125,14 @@ def plot_state_corr_xy(
 
         cbar = fig.colorbar(colorbar.mappable, cax=cax, orientation="vertical")
         cbar.set_label(colorbar.label)
-        cbar.ax.tick_params(left=True, right=True)
+        cbar.ax.tick_params(
+            which="major",
+            direction="out",
+            right=True,
+            left=False,
+            width=mpl_opts["ytick.major.width"],
+            length=mpl_opts["ytick.major.size"],
+        )
 
         if hasattr(colorbar, "tick_lab"):
             cbar.set_ticks(colorbar.tick_pos)
@@ -1068,7 +1142,14 @@ def plot_state_corr_xy(
             if not colorbar.tick_show:
                 cbar.ax.tick_params(left=False, right=False)
 
-        cbar.ax.tick_params(which="minor", left=False, right=False)
+        cbar.ax.tick_params(
+            which="minor",
+            direction="out",
+            right=True,
+            left=False,
+            width=mpl_opts["ytick.minor.width"],
+            length=mpl_opts["ytick.minor.size"],
+        )
 
     # Ensure that the scatter plot focuses on the data points:
     ax.set_xlim(

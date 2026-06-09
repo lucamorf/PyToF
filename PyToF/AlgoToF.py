@@ -555,6 +555,7 @@ def B9(fs, z, rho, rho_bar, opts):
             initial=0,
             axis=-1,
         )
+
     else:
         integral = scipy.integrate.cumulative_trapezoid(
             integrand, x=domain, initial=0, axis=-1

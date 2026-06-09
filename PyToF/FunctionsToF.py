@@ -339,15 +339,15 @@ def get_Js_errors(class_obj):
     if class_obj.opts["use_simpson"]:
         print(
             c.INFO
-            + 'The option'
+            + "The option"
             + c.ENDC
-            + ' use_simpson'
+            + " use_simpson"
             + c.INFO
-            + ' is' 
+            + " is"
             + c.NUMB
-            + ' True'
+            + " True"
             + c.INFO
-            + '. This ensures the highest possible accuracy.'
+            + ". This ensures the highest possible accuracy."
             + c.ENDC
         )
         HERE = Path(__file__).resolve().parent
@@ -355,20 +355,20 @@ def get_Js_errors(class_obj):
     else:
         print(
             c.INFO
-            + 'The option'
+            + "The option"
             + c.ENDC
-            + ' use_simpson'
+            + " use_simpson"
             + c.INFO
-            + ' is' 
+            + " is"
             + c.NUMB
-            + ' False'
+            + " False"
             + c.INFO
-            + '. This yields a reduced accuracy. PyToF may have set this'
-            + ' flag to'
+            + ". This yields a reduced accuracy. PyToF may have set this"
+            + " flag to"
             + c.NUMB
-            + ' False'
+            + " False"
             + c.INFO
-            + ' without user input to mitigate stability issues.'
+            + " without user input to mitigate stability issues."
             + c.ENDC
         )
         HERE = Path(__file__).resolve().parent
@@ -503,6 +503,118 @@ def get_NMoI(class_obj, N=1000):
     NMoI = MoI / (_mass_int(class_obj) * class_obj.li[0] ** 2)
 
     return NMoI
+
+
+def get_Kn(class_obj, n, bs=None):
+    """
+    This function returns arrays r, T_n and K_n. K_n(r) is the Love function
+    of n-th degree based on solving a differential equation for T_n(r).
+
+    n: An integer greater or equal to two, determines Love function degree.
+    bs: An array that contains the radii of all density discontinuities.
+    """
+
+    # Assure that the potential has been calculated for the current density
+    # distribution:
+    _pressurize(class_obj)
+
+    # Get smallest and largest radius:
+    r0 = class_obj.li[-1]
+    R = class_obj.li[0]
+    assert r0 < R
+
+    # Define array with all radii where boundary conditions apply:
+    if bs is None:
+        bs = np.array([r0, R])
+    else:
+        bs = np.concatenate(
+            (np.atleast_1d(r0), np.atleast_1d(bs), np.atleast_1d(R))
+        )
+
+    # Calculate density and potential derivatives:
+    rho_prime = scipy.interpolate.interp1d(
+        class_obj.li[::-1], np.gradient(class_obj.rhoi, class_obj.li)[::-1]
+    )
+    U_prime = scipy.interpolate.interp1d(
+        class_obj.li[::-1], np.gradient(class_obj.U, class_obj.li)[::-1]
+    )
+
+    # Define right-hand side of the differential equation:
+    # (1D, 2nd order) -> (2D, 1st order)
+    def rhs(t, y):
+        Q = (
+            4 * np.pi * class_obj.opts["G"] * rho_prime(t) / U_prime(t)
+            + n * (n + 1) / t**2
+        )
+        return [y[1], Q * y[0] - 2 / t * y[1]]
+
+    # Initial condition:
+    y0 = [1.0, n / r0]
+
+    # Solve first part of the differential equation:
+    sol = scipy.integrate.solve_ivp(
+        rhs, (bs[0], bs[1]), y0, max_step=(R - r0) / class_obj.opts["N"]
+    )
+
+    # Store solutions:
+    r = sol.t
+    T_n = sol.y[0]
+    T_n_prime = sol.y[1]
+
+    # Solve further parts of the differential equation, if there are any:
+    for i in range(1, len(bs) - 1):
+        # Find index closest to boundary:
+        index = np.argmin(np.abs(class_obj.li - bs[i]))
+
+        # Calculate jump in density:
+        delta_rho = max(
+            class_obj.rhoi[index] - class_obj.rhoi[index - 1],
+            class_obj.rhoi[index + 1] - class_obj.rhoi[index],
+        )
+        print(
+            f"{c.INFO}Boundary condition applied at a radius of r/R="
+            f"{c.NUMB}{bs[i] / R:.2f}"
+            f"{c.INFO} with a density jump of "
+            f"{c.NUMB}{delta_rho:.2e}"
+            f"{c.INFO}kg/m^3.{c.ENDC}"
+        )
+
+        # Initial condition:
+        y0 = [
+            T_n[-1],
+            T_n_prime[-1]
+            + 4
+            * np.pi
+            * class_obj.opts["G"]
+            * delta_rho
+            * T_n[-1]
+            / U_prime(bs[i]),
+        ]
+
+        # Solve further parts of the differential equation:
+        sol = scipy.integrate.solve_ivp(
+            rhs,
+            (bs[i], bs[i + 1]),
+            y0,
+            max_step=(R - r0) / class_obj.opts["N"],
+        )
+
+        # Store solutions:
+        r = np.concatenate((r, sol.t))
+        T_n = np.concatenate((T_n, sol.y[0]))
+        T_n_prime = np.concatenate((T_n_prime, sol.y[1]))
+
+    # Apply final boundary condition:
+    scale = (
+        (2 * n + 1) * U_prime(R) / (sol.y[1, -1] + (n + 1) * sol.y[0, -1] / R)
+    )
+    T_n *= scale
+    T_n_prime *= scale
+
+    # Calculate Love function:
+    K_n = ((T_n / R / U_prime(R)) - (r / R) ** n)
+
+    return r, T_n, K_n
 
 
 def set_barotrope(class_obj, fun):
