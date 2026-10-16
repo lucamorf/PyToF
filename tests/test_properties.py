@@ -45,7 +45,9 @@ def test_relaxation_is_deterministic():
 def test_mass_and_radius_are_conserved():
     X = jupiter_polytrope(7, N=512)
     assert _mass_int(X) == pytest.approx(X.opts["M_phys"], rel=1e-8)
-    assert X.R_eq_to_R_m * X.li[0] == pytest.approx(X.opts["R_phys"][0], rel=1e-8)
+    assert X.R_eq_to_R_m * X.li[0] == pytest.approx(
+        X.opts["R_phys"][0], rel=1e-8
+    )
 
 
 def test_profiles_are_physical():

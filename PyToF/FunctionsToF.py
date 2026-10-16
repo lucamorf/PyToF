@@ -500,7 +500,9 @@ def get_NMoI(class_obj, N=1000):
         )
 
     integrand_l = scipy.integrate.simpson(integrand_l_theta, x=mu, axis=1)
-    MoI = -scipy.integrate.simpson(integrand_l, x=class_obj.li)  # minus sign due
+    MoI = -scipy.integrate.simpson(
+        integrand_l, x=class_obj.li
+    )  # minus sign due
     # to integration from outside to inside
     NMoI = MoI / (_mass_int(class_obj) * class_obj.li[0] ** 2)
 
@@ -555,9 +557,9 @@ def get_Kn(class_obj, n, bs=None):
 
     # Solve first part of the differential equation:
     sol = scipy.integrate.solve_ivp(
-        rhs, 
+        rhs,
         (bs[0], bs[1]),
-        y0, 
+        y0,
         max_step=(R - r0) / class_obj.opts["N"],
     )
 

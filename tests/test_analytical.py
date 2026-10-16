@@ -1,8 +1,8 @@
 """Closed-form checks: no reference code or literature table needed."""
 
 import numpy as np
-from scipy.integrate import trapezoid
 import pytest
+from scipy.integrate import trapezoid
 
 from tests.cases import uniform_sphere
 
@@ -19,7 +19,9 @@ def test_sphere_nmoi_linear_density():
     mass = -4 * np.pi * trapezoid(rho * radii**2, x=radii)
     from PyToF import ClassToF
 
-    X = ClassToF.ToF(N=N, M_phys=mass, R_phys=[radius, "mean"], Period=np.inf, order=4)
+    X = ClassToF.ToF(
+        N=N, M_phys=mass, R_phys=[radius, "mean"], Period=np.inf, order=4
+    )
     X.li, X.rhoi = radii, rho
     X.m_rot_calc = 0.0
     X.relax_to_shape()

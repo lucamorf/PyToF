@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyToF"
+version = "1.7.0"
+description = "Theory of Figures (4th, 7th, 10th order) including barotropic differential rotation"
+readme = "README.md"
+license = { text = "MPL-2.0" }
+authors = [{ name = "Luca Morf", email = "luca.morf@uzh.ch" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.12",  # scipy.integrate.cumulative_simpson was added in 1.12
+    "matplotlib>=3.7",
+    "emcee>=3.1",
+    "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+dev = ["pytest>=7", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["PyToF*"]
+
+[tool.setuptools.package-data]
+PyToF = ["*.npz"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+extend-exclude = ["build", "nmovshov_ToFPlanet"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

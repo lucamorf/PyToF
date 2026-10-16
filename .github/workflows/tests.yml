@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # weekly: catches upstream breakage (e.g. SciPy 1.14 simpson)
+
+jobs:
+  pinned:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {python: "3.10", numpy: "1.26.4", scipy: "1.12.0"}  # oldest supported
+          - {python: "3.11", numpy: "2.0.2", scipy: "1.14.1"}
+          - {python: "3.12", numpy: "2.2.6", scipy: "1.15.3"}  # reference
+          - {python: "3.13", numpy: "2.3.5", scipy: "1.16.3"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ matrix.python }}"}
+      - run: pip install "numpy==${{ matrix.numpy }}" "scipy==${{ matrix.scipy }}"
+      - run: pip install -e ".[test]"
+      - run: pytest
+
+  latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install -e ".[dev]"
+      - run: pytest
+      - run: ruff check PyToF tests --exclude PyToF/PlotDebugToF.py

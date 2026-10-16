@@ -14,7 +14,9 @@ import pytest
 
 from tests.cases import GOLDEN_CASES, summarize
 
-GOLDEN = json.loads((Path(__file__).parent / "golden" / "golden.json").read_text())
+GOLDEN = json.loads(
+    (Path(__file__).parent / "golden" / "golden.json").read_text()
+)
 
 # Pure floating-point algebra; allow only platform-level round-off.
 RTOL = 1e-9

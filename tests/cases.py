@@ -54,7 +54,9 @@ def uniform_sphere(N=1024, period=np.inf, radius=1e6, rho=1000.0, order=4):
     )
     X.li = radii
     X.rhoi = rho * np.ones(N)
-    X.m_rot_calc = (2 * np.pi / period) ** 2 * X.li[0] ** 3 / (X.opts["G"] * mass)
+    X.m_rot_calc = (
+        (2 * np.pi / period) ** 2 * X.li[0] ** 3 / (X.opts["G"] * mass)
+    )
     X.relax_to_shape()
     return X
 
@@ -116,7 +118,9 @@ def _density_case():
     X.li = radii
     X.rhoi = rho0 * np.ones(N)
     X.m_rot_calc = (
-        (2 * np.pi / X.opts["Period"]) ** 2 * X.li[0] ** 3 / (X.opts["G"] * mass)
+        (2 * np.pi / X.opts["Period"]) ** 2
+        * X.li[0] ** 3
+        / (X.opts["G"] * mass)
     )
     # relax_to_density() keeps the densities it is given (it only updates
     # shape and pressure), so we set them from the density function here.
@@ -151,9 +155,13 @@ GOLDEN_CASES = {
     "jupiter_o4": lambda: jupiter_polytrope(4, 256),
     "jupiter_o7": lambda: jupiter_polytrope(7, 256),
     "jupiter_o10": lambda: jupiter_polytrope(10, 256),
-    "jupiter_o7_trapezoid": lambda: jupiter_polytrope(7, 256, use_simpson=False),
+    "jupiter_o7_trapezoid": lambda: jupiter_polytrope(
+        7, 256, use_simpson=False
+    ),
     "jupiter_o7_binned": lambda: jupiter_polytrope(7, 512, n_bin=128),
-    "jupiter_o7_diffrot": lambda: jupiter_polytrope(7, 256, alphas=ALPHAS_WH16),
+    "jupiter_o7_diffrot": lambda: jupiter_polytrope(
+        7, 256, alphas=ALPHAS_WH16
+    ),
     "spheroid_o4": lambda: uniform_sphere(N=256, period=24 * 3600, order=4),
     "density_o4": _density_case,
     "atmosphere_o4": _atmosphere_case,
