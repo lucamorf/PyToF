@@ -24,7 +24,7 @@ def _mass_int(class_obj):
         -4
         * np.pi
         * scipy.integrate.simpson(
-            class_obj.rhoi * class_obj.li**2, class_obj.li
+            class_obj.rhoi * class_obj.li**2, x=class_obj.li
         )
     )
 
@@ -499,8 +499,8 @@ def get_NMoI(class_obj, N=1000):
             + c.ENDC
         )
 
-    integrand_l = scipy.integrate.simpson(integrand_l_theta, mu, axis=1)
-    MoI = -scipy.integrate.simpson(integrand_l, class_obj.li)  # minus sign due
+    integrand_l = scipy.integrate.simpson(integrand_l_theta, x=mu, axis=1)
+    MoI = -scipy.integrate.simpson(integrand_l, x=class_obj.li)  # minus sign due
     # to integration from outside to inside
     NMoI = MoI / (_mass_int(class_obj) * class_obj.li[0] ** 2)
 

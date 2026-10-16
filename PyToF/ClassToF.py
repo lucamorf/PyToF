@@ -169,7 +169,7 @@ class ToF:
             / (
                 -4
                 * np.pi
-                * scipy.integrate.simpson(rho_pre * self.li**2, self.li)
+                * scipy.integrate.simpson(rho_pre * self.li**2, x=self.li)
             )
         )
         self.Pi = np.zeros(self.opts["N"])

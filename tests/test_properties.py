@@ -45,9 +45,7 @@ def test_relaxation_is_deterministic():
 def test_mass_and_radius_are_conserved():
     X = jupiter_polytrope(7, N=512)
     assert _mass_int(X) == pytest.approx(X.opts["M_phys"], rel=1e-8)
-    assert X.R_eq_to_R_m * X.li[0] == pytest.approx(
-        X.opts["R_phys"][0], rel=1e-8
-    )
+    assert X.R_eq_to_R_m * X.li[0] == pytest.approx(X.opts["R_phys"][0], rel=1e-8)
 
 
 def test_profiles_are_physical():
@@ -98,14 +96,38 @@ def test_public_api_surface():
     # Guards the refactor of ClassToF (step 03): nothing may disappear.
     X = ClassToF.ToF()
     methods = [
-        "relax_to_shape", "relax_to_barotrope", "relax_to_density",
-        "set_barotrope", "set_density_function", "set_check_param",
-        "get_Js_errors", "get_NMoI", "get_Kn", "get_r_l_mu", "get_U_l_mu",
-        "run_baro_MC", "run_dens_MC", "baro_cost_function",
-        "dens_cost_function", "classify_and_save_state",
+        "relax_to_shape",
+        "relax_to_barotrope",
+        "relax_to_density",
+        "set_barotrope",
+        "set_density_function",
+        "set_check_param",
+        "get_Js_errors",
+        "get_NMoI",
+        "get_Kn",
+        "get_r_l_mu",
+        "get_U_l_mu",
+        "run_baro_MC",
+        "run_dens_MC",
+        "baro_cost_function",
+        "dens_cost_function",
+        "classify_and_save_state",
     ]
     for name in methods:
         assert callable(getattr(X, name)), name
-    for name in ["li", "rhoi", "Pi", "Js", "Js_error", "R_calc", "ss", "SS",
-                 "A0", "R_eq_to_R_m", "R_po_to_R_m", "m_rot_calc", "opts"]:
+    for name in [
+        "li",
+        "rhoi",
+        "Pi",
+        "Js",
+        "Js_error",
+        "R_calc",
+        "ss",
+        "SS",
+        "A0",
+        "R_eq_to_R_m",
+        "R_po_to_R_m",
+        "m_rot_calc",
+        "opts",
+    ]:
         assert hasattr(X, name), name
