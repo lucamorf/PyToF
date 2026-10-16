@@ -79,7 +79,7 @@ def _apply_mpl_opts(opts):
             continue
 
 
-def debug_FunctionsToF_plot(class_obj, what_x=0, new=True, iteration=0):
+def debug_FunctionsToF_plot(tof, what_x=0, new=True, iteration=0):
     """
     Generate and update diagnostic plots for density and pressure profiles
     during FunctionsToF execution.
@@ -93,7 +93,7 @@ def debug_FunctionsToF_plot(class_obj, what_x=0, new=True, iteration=0):
 
     Parameters
     ----------
-    class_obj:      PyToF object, see ClassToF.py.
+    tof:      PyToF object, see ClassToF.py.
     what_x:         Integer index selecting the quantity to plot along the x
                     axis.
     new:            If True, initialize new figures and reset the plotting 
@@ -112,17 +112,17 @@ def debug_FunctionsToF_plot(class_obj, what_x=0, new=True, iteration=0):
         4
         / 3
         * np.pi
-        * (class_obj.li**3 - np.append(class_obj.li[1:], 0) ** 3)
-        * class_obj.rhoi
+        * (tof.li**3 - np.append(tof.li[1:], 0) ** 3)
+        * tof.rhoi
     )
     summed_m = np.array([sum(shell_m[i:]) for i in range(len(shell_m))])
 
     # Data for plotting:
     xs = [
-        class_obj.li / class_obj.li[0],
+        tof.li / tof.li[0],
         summed_m / summed_m[0],
-        class_obj.rhoi / 1000,
-        class_obj.Pi / 1e5,
+        tof.rhoi / 1000,
+        tof.Pi / 1e5,
     ]
     label_xs = [
         r"average $r/R$",
@@ -136,34 +136,34 @@ def debug_FunctionsToF_plot(class_obj, what_x=0, new=True, iteration=0):
     # Initialize figures on first call:
     if new:
 
-        class_obj.bugfix_offset = 0
+        tof.bugfix_offset = 0
         
-        class_obj.bugfix_rho_fig, class_obj.bugfix_rho_ax = plt.subplots(layout="constrained")
-        class_obj.bugfix_rho_ax.set_xscale(scale_xs[what_x])
-        class_obj.bugfix_rho_ax.set_xlabel(label_xs[what_x])
-        class_obj.bugfix_rho_ax.set_ylabel(r"normalized $\rho$ + offset")
-        class_obj.bugfix_rho_ax.set_yticks([])
+        tof.bugfix_rho_fig, tof.bugfix_rho_ax = plt.subplots(layout="constrained")
+        tof.bugfix_rho_ax.set_xscale(scale_xs[what_x])
+        tof.bugfix_rho_ax.set_xlabel(label_xs[what_x])
+        tof.bugfix_rho_ax.set_ylabel(r"normalized $\rho$ + offset")
+        tof.bugfix_rho_ax.set_yticks([])
 
-        class_obj.bugfix_P_fig, class_obj.bugfix_P_ax = plt.subplots(layout="constrained")
-        class_obj.bugfix_P_ax.set_xscale(scale_xs[what_x])
-        class_obj.bugfix_P_ax.set_xlabel(label_xs[what_x])
-        class_obj.bugfix_P_ax.set_ylabel(r"normalized $P$ + offset")
-        class_obj.bugfix_P_ax.set_yticks([])
+        tof.bugfix_P_fig, tof.bugfix_P_ax = plt.subplots(layout="constrained")
+        tof.bugfix_P_ax.set_xscale(scale_xs[what_x])
+        tof.bugfix_P_ax.set_xlabel(label_xs[what_x])
+        tof.bugfix_P_ax.set_ylabel(r"normalized $P$ + offset")
+        tof.bugfix_P_ax.set_yticks([])
         
-    class_obj.bugfix_rho_ax.plot(       xs[what_x], class_obj.rhoi/np.max(abs(class_obj.rhoi))+offset*(class_obj.bugfix_offset-1), color='C'+str(class_obj.bugfix_offset))
-    class_obj.bugfix_P_ax.plot(         xs[what_x], class_obj.Pi  /np.max(abs(class_obj.Pi))  +offset*(class_obj.bugfix_offset-1), color='C'+str(class_obj.bugfix_offset))
+    tof.bugfix_rho_ax.plot(       xs[what_x], tof.rhoi/np.max(abs(tof.rhoi))+offset*(tof.bugfix_offset-1), color='C'+str(tof.bugfix_offset))
+    tof.bugfix_P_ax.plot(         xs[what_x], tof.Pi  /np.max(abs(tof.Pi))  +offset*(tof.bugfix_offset-1), color='C'+str(tof.bugfix_offset))
 
-    class_obj.bugfix_rho_ax.annotate(   str(class_obj.bugfix_offset), (xs[what_x][0], class_obj.rhoi[0]/np.max(abs(class_obj.rhoi))+offset*(class_obj.bugfix_offset-1)))
-    class_obj.bugfix_P_ax.annotate(     str(class_obj.bugfix_offset), (xs[what_x][0], class_obj.Pi[0]  /np.max(abs(class_obj.Pi))  +offset*(class_obj.bugfix_offset-1)))
+    tof.bugfix_rho_ax.annotate(   str(tof.bugfix_offset), (xs[what_x][0], tof.rhoi[0]/np.max(abs(tof.rhoi))+offset*(tof.bugfix_offset-1)))
+    tof.bugfix_P_ax.annotate(     str(tof.bugfix_offset), (xs[what_x][0], tof.Pi[0]  /np.max(abs(tof.Pi))  +offset*(tof.bugfix_offset-1)))
 
-    class_obj.bugfix_rho_fig.savefig(
+    tof.bugfix_rho_fig.savefig(
             f"debug_FunctionsToF_rho_{iteration}.png", format="png", transparent=False
     )
-    class_obj.bugfix_P_fig.savefig(
+    tof.bugfix_P_fig.savefig(
         f"debug_FunctionsToF_P_{iteration}.png", format="png", transparent=False
     )
 
-    class_obj.bugfix_offset += 1
+    tof.bugfix_offset += 1
 
 
 def debug_AlgoToF_plot(ToF_order, z, domain, fs, integrand, integrand_p, integral, integral_p, names):

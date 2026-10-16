@@ -14,17 +14,17 @@ from PyToF.messages import paint, say
 multiprocessing.set_start_method("fork", force=True)
 
 
-def _check_phys(class_obj):
+def _check_phys(tof):
     """
     This function returns True if the current solutions
-    (class_obj.rhoi, class_obj.Pi, class_obj.Js) are unphysical or consisting
+    (tof.rhoi, tof.Pi, tof.Js) are unphysical or consisting
     of NaN values. Returns False if everything is ok.
     """
 
     # Density inversions are considered to be unphysical:
-    if np.any(np.diff(class_obj.rhoi) < 0):
+    if np.any(np.diff(tof.rhoi) < 0):
         say(
-            class_obj.opts["verbosity"],
+            tof.opts["verbosity"],
             2,
             "Physicality warning: density inversion!",
             kind="warn",
@@ -34,12 +34,12 @@ def _check_phys(class_obj):
 
     # There should be no NaN values:
     elif (
-        np.isnan(class_obj.rhoi).any()
-        or np.isnan(class_obj.Pi).any()
-        or np.isnan(class_obj.Js).any()
+        np.isnan(tof.rhoi).any()
+        or np.isnan(tof.Pi).any()
+        or np.isnan(tof.Js).any()
     ):
         say(
-            class_obj.opts["verbosity"],
+            tof.opts["verbosity"],
             2,
             "Physicality warning: NaN values!",
             kind="warn",
@@ -48,9 +48,9 @@ def _check_phys(class_obj):
         return True
 
     # There should be no negative density or pressure values:
-    elif (np.min(class_obj.rhoi) < 0) or (np.min(class_obj.Pi) < 0):
+    elif (np.min(tof.rhoi) < 0) or (np.min(tof.Pi) < 0):
         say(
-            class_obj.opts["verbosity"],
+            tof.opts["verbosity"],
             2,
             "Physicality warning: negative density or pressure values!",
             kind="warn",
@@ -59,11 +59,11 @@ def _check_phys(class_obj):
         return True
 
     # There should be no density or pressure values above the given maxima:
-    elif (np.max(class_obj.rhoi) > class_obj.opts["rho_max"]) or (
-        np.max(class_obj.Pi) > class_obj.opts["P_max"]
+    elif (np.max(tof.rhoi) > tof.opts["rho_max"]) or (
+        np.max(tof.Pi) > tof.opts["P_max"]
     ):
         say(
-            class_obj.opts["verbosity"],
+            tof.opts["verbosity"],
             2,
             "Physicality warning: density or pressure values above the "
             "given maxima!",
@@ -77,7 +77,7 @@ def _check_phys(class_obj):
         return False
 
 
-def set_check_param(class_obj, fun):
+def set_check_param(self, fun):
     """
     This function allows the user to set the function that checks the
     parameters for the barotrope or density function. The function fun should
@@ -88,10 +88,10 @@ def set_check_param(class_obj, fun):
     """
 
     # Set function:
-    class_obj.check_param = fun
+    self.check_param = fun
 
 
-def baro_cost_function(class_obj, param, return_sum=True):
+def baro_cost_function(self, param, return_sum=True):
     """
     Calls relax_to_barotrope() and returns values specifying how far off the
     calculated Js are from opts['target_Js'] given opts['sigma_Js'].
@@ -102,45 +102,45 @@ def baro_cost_function(class_obj, param, return_sum=True):
     """
 
     # Infinite cost if the parameters are out of bounds:
-    if class_obj.check_param(param):
+    if self.check_param(param):
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Reset to initial conditions:
-    class_obj.reset()
+    self.reset()
 
     # Update the internal parameters:
-    class_obj.baro_param_calc = param
+    self.baro_param_calc = param
 
     # Call relax_to_barotrope():
     try:
-        it = class_obj.relax_to_barotrope()
+        it = self.relax_to_barotrope()
 
     except ValueError:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Infinite cost if the result is unphysical:
-    if _check_phys(class_obj) or it == class_obj.opts["max_iter_barotrope"]:
+    if _check_phys(self) or it == self.opts["max_iter_barotrope"]:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Calculate the cost, i.e. the deviation from the target values:
-    costJs = np.zeros_like(class_obj.opts["target_Js"])
+    costJs = np.zeros_like(self.opts["target_Js"])
 
     for i in range(len(costJs)):
         costJs[i] = (
-            -((class_obj.Js[i + 1] - class_obj.opts["target_Js"][i]) ** 2)
-            / class_obj.opts["sigma_Js"][i] ** 2
+            -((self.Js[i + 1] - self.opts["target_Js"][i]) ** 2)
+            / self.opts["sigma_Js"][i] ** 2
         )
 
     # Return the cost value:
@@ -151,7 +151,7 @@ def baro_cost_function(class_obj, param, return_sum=True):
         return costJs
 
 
-def dens_cost_function(class_obj, param, return_sum=True):
+def dens_cost_function(self, param, return_sum=True):
     """
     Calls relax_to_barotrope() and returns values specifying how far off the
     calculated Js are from opts['target_Js'] given opts['sigma_Js'].
@@ -162,50 +162,50 @@ def dens_cost_function(class_obj, param, return_sum=True):
     """
 
     # Infinite cost if the parameters are out of bounds:
-    if class_obj.check_param(param):
+    if self.check_param(param):
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Reset to initial conditions:
-    class_obj.reset()
+    self.reset()
 
-    # Get densities according to class_obj.density_function():
-    class_obj.rhoi = class_obj.density_function(
-        class_obj.li, class_obj.opts["M_phys"], param=param
+    # Get densities according to self.density_function():
+    self.rhoi = self.density_function(
+        self.li, self.opts["M_phys"], param=param
     )
 
     # Update the internal parameters:
-    class_obj.dens_param_calc = param
+    self.dens_param_calc = param
 
     # Call relax_to_density():
     try:
-        it = class_obj.relax_to_density()
+        it = self.relax_to_density()
 
     except ValueError:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Infinite cost if the result is unphysical:
-    if _check_phys(class_obj) or it == class_obj.opts["max_iter_density"]:
+    if _check_phys(self) or it == self.opts["max_iter_density"]:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["target_Js"])
+            return [-np.inf] * len(self.opts["target_Js"])
 
     # Calculate the cost, i.e. the deviation from the target values:
-    costJs = np.zeros_like(class_obj.opts["target_Js"])
+    costJs = np.zeros_like(self.opts["target_Js"])
 
     for i in range(len(costJs)):
         costJs[i] = (
-            -((class_obj.Js[i + 1] - class_obj.opts["target_Js"][i]) ** 2)
-            / class_obj.opts["sigma_Js"][i] ** 2
+            -((self.Js[i + 1] - self.opts["target_Js"][i]) ** 2)
+            / self.opts["sigma_Js"][i] ** 2
         )
 
     # Return the cost value:
@@ -216,23 +216,23 @@ def dens_cost_function(class_obj, param, return_sum=True):
         return costJs
 
 
-def baro_log_prob(param, class_obj):
+def baro_log_prob(param, tof):
     """
     Changes order of arguments for the emcee algorithm.
     """
 
-    return baro_cost_function(class_obj, param)
+    return baro_cost_function(tof, param)
 
 
-def dens_log_prob(param, class_obj):
+def dens_log_prob(param, tof):
     """
     Changes order of arguments for the emcee algorithm.
     """
 
-    return dens_cost_function(class_obj, param)
+    return dens_cost_function(tof, param)
 
 
-def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
+def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
     """
     Uses the emcee algorithm for the given amount of steps and creates nwalkers
     many parameter candidates (i.e. walkers) that will explore the allowed
@@ -240,7 +240,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     """
 
     # Find a random set of starting parameters:
-    param_0 = np.zeros((nwalkers, len(class_obj.opts["baro_param_init"])))
+    param_0 = np.zeros((nwalkers, len(self.opts["baro_param_init"])))
 
     # Set up iterative procedure:
     i = 0
@@ -248,36 +248,34 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     while i < nwalkers:
         # Propose a new candidate:
         param_0[i, :] = (
-            np.random.rand(1, len(class_obj.opts["baro_param_init"]))
-            * class_obj.opts["baro_param_init"]
+            np.random.rand(1, len(self.opts["baro_param_init"]))
+            * self.opts["baro_param_init"]
         )
 
         # Propose new candidates as long the previous one is out of bounds:
-        while class_obj.check_param(param_0[i, :]):
+        while self.check_param(param_0[i, :]):
             param_0[i, :] = (
-                np.random.rand(1, len(class_obj.opts["baro_param_init"]))
-                * class_obj.opts["baro_param_init"]
+                np.random.rand(1, len(self.opts["baro_param_init"]))
+                * self.opts["baro_param_init"]
             )
 
         # Reset to initial conditions:
-        class_obj.reset()
+        self.reset()
 
         # Update the internal parameters:
-        class_obj.baro_param_calc = param_0[i, :]
+        self.baro_param_calc = param_0[i, :]
 
         # Call relax_to_barotrope():
         try:
-            it = class_obj.relax_to_barotrope()
+            it = self.relax_to_barotrope()
 
         except ValueError:
             continue
 
         # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(class_obj)) and it < class_obj.opts[
-            "max_iter_barotrope"
-        ]:
+        if (not _check_phys(self)) and it < self.opts["max_iter_barotrope"]:
             say(
-                class_obj.opts["verbosity"],
+                self.opts["verbosity"],
                 1,
                 "Generated initial conditions for walker number: {i}",
                 i=i,
@@ -285,15 +283,15 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
             i = i + 1
 
-    if class_obj.opts["verbosity"] > 0:
+    if self.opts["verbosity"] > 0:
         progress = True
         average = 0
 
         for i in range(nwalkers):
-            average += baro_cost_function(class_obj, param_0[i, :]) / nwalkers
+            average += baro_cost_function(self, param_0[i, :]) / nwalkers
 
         say(
-            class_obj.opts["verbosity"],
+            self.opts["verbosity"],
             1,
             "Average cost of a walker with the generated initial "
             "parameters: {average:.2e}",
@@ -308,9 +306,9 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         with multiprocessing.Pool(processes=Ncores) as pool:
             sampler = emcee.EnsembleSampler(
                 nwalkers,
-                len(class_obj.opts["baro_param_init"]),
+                len(self.opts["baro_param_init"]),
                 baro_log_prob,
-                args=[class_obj],
+                args=[self],
                 pool=pool,
             )
 
@@ -343,9 +341,9 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         # Set up the Markov Chain Monte Carlo class from emcee:
         sampler = emcee.EnsembleSampler(
             nwalkers,
-            len(class_obj.opts["baro_param_init"]),
+            len(self.opts["baro_param_init"]),
             baro_log_prob,
-            args=[class_obj],
+            args=[self],
         )
 
         # Run the Markov Chain Monte Carlo class from emcee:
@@ -373,7 +371,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         state = _sample
 
     say(
-        class_obj.opts["verbosity"],
+        self.opts["verbosity"],
         1,
         "Average cost of a walker after the Markov Chain Monte Carlo walk: "
         "{average:.2e}",
@@ -383,7 +381,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     return state[0], autocorr[:index]
 
 
-def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
+def run_dens_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
     """
     Uses the emcee algorithm for the given amount of steps and creates nwalkers
     many parameter candidates (i.e. walkers) that will explore the allowed
@@ -391,7 +389,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     """
 
     # Find a random set of starting parameters:
-    param_0 = np.zeros((nwalkers, len(class_obj.opts["dens_param_init"])))
+    param_0 = np.zeros((nwalkers, len(self.opts["dens_param_init"])))
 
     # Set up iterative procedure:
     i = 0
@@ -399,41 +397,39 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
     while i < nwalkers:
         # Propose a new candidate:
         param_0[i, :] = (
-            np.random.rand(1, len(class_obj.opts["dens_param_init"]))
-            * class_obj.opts["dens_param_init"]
+            np.random.rand(1, len(self.opts["dens_param_init"]))
+            * self.opts["dens_param_init"]
         )
 
         # Propose new candidates as long the previous one is out of bounds:
-        while class_obj.check_param(param_0[i, :]):
+        while self.check_param(param_0[i, :]):
             param_0[i, :] = (
-                np.random.rand(1, len(class_obj.opts["dens_param_init"]))
-                * class_obj.opts["dens_param_init"]
+                np.random.rand(1, len(self.opts["dens_param_init"]))
+                * self.opts["dens_param_init"]
             )
 
         # Reset to initial conditions:
-        class_obj.reset()
+        self.reset()
 
-        # Get densities according to class_obj.density_function():
-        class_obj.rhoi = class_obj.density_function(
-            class_obj.li, class_obj.opts["M_phys"], param=param_0[i, :]
+        # Get densities according to self.density_function():
+        self.rhoi = self.density_function(
+            self.li, self.opts["M_phys"], param=param_0[i, :]
         )
 
         # Update the internal parameters:
-        class_obj.dens_param_calc = param_0[i, :]
+        self.dens_param_calc = param_0[i, :]
 
         # Call relax_to_density():
         try:
-            it = class_obj.relax_to_density()
+            it = self.relax_to_density()
 
         except ValueError:
             continue
 
         # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(class_obj)) and it < class_obj.opts[
-            "max_iter_density"
-        ]:
+        if (not _check_phys(self)) and it < self.opts["max_iter_density"]:
             say(
-                class_obj.opts["verbosity"],
+                self.opts["verbosity"],
                 1,
                 "Generated initial conditions for walker number: {i}",
                 i=i,
@@ -441,15 +437,15 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
             i = i + 1
 
-    if class_obj.opts["verbosity"] > 0:
+    if self.opts["verbosity"] > 0:
         progress = True
         average = 0
 
         for i in range(nwalkers):
-            average += dens_cost_function(class_obj, param_0[i, :]) / nwalkers
+            average += dens_cost_function(self, param_0[i, :]) / nwalkers
 
         say(
-            class_obj.opts["verbosity"],
+            self.opts["verbosity"],
             1,
             "Average cost of a walker with the generated initial "
             "parameters: {average:.2e}",
@@ -464,9 +460,9 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         with multiprocessing.Pool(processes=Ncores) as pool:
             sampler = emcee.EnsembleSampler(
                 nwalkers,
-                len(class_obj.opts["dens_param_init"]),
+                len(self.opts["dens_param_init"]),
                 dens_log_prob,
-                args=[class_obj],
+                args=[self],
                 pool=pool,
             )
 
@@ -499,9 +495,9 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         # Set up the Markov Chain Monte Carlo class from emcee:
         sampler = emcee.EnsembleSampler(
             nwalkers,
-            len(class_obj.opts["dens_param_init"]),
+            len(self.opts["dens_param_init"]),
             dens_log_prob,
-            args=[class_obj],
+            args=[self],
         )
 
         # Run the Markov Chain Monte Carlo class from emcee:
@@ -529,7 +525,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         state = _sample
 
     say(
-        class_obj.opts["verbosity"],
+        self.opts["verbosity"],
         1,
         "Average cost of a walker after the Markov Chain Monte Carlo walk: "
         "{average:.2e}",
@@ -540,7 +536,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
 
 def classify_and_save_state(
-    class_obj,
+    self,
     state,
     what_model,
     what_save="none",
@@ -566,14 +562,10 @@ def classify_and_save_state(
     for i in range(len(state[:, 0])):
         # Calculate the physical cost:
         if what_model == "baro":
-            costJs = baro_cost_function(
-                class_obj, state[i, :], return_sum=False
-            )
+            costJs = baro_cost_function(self, state[i, :], return_sum=False)
 
         elif what_model == "dens":
-            costJs = dens_cost_function(
-                class_obj, state[i, :], return_sum=False
-            )
+            costJs = dens_cost_function(self, state[i, :], return_sum=False)
 
         else:
             raise KeyError(
@@ -599,9 +591,9 @@ def classify_and_save_state(
                     np.transpose(
                         np.array(
                             [
-                                class_obj.li * 100,
-                                np.log10(class_obj.rhoi) - 3,
-                                np.log10(class_obj.Pi) + 1,
+                                self.li * 100,
+                                np.log10(self.rhoi) - 3,
+                                np.log10(self.Pi) + 1,
                             ]
                         )
                     ),
@@ -612,9 +604,7 @@ def classify_and_save_state(
             ):
                 np.savetxt(
                     path_name + "/" + file_name + "_SI_" + str(i) + ".txt",
-                    np.transpose(
-                        np.array([class_obj.li, class_obj.rhoi, class_obj.Pi])
-                    ),
+                    np.transpose(np.array([self.li, self.rhoi, self.Pi])),
                 )
 
         elif what_save == "good" and (np.abs(costJs) < 1e0).all():
@@ -624,9 +614,9 @@ def classify_and_save_state(
                     np.transpose(
                         np.array(
                             [
-                                class_obj.li * 100,
-                                np.log10(class_obj.rhoi) - 3,
-                                np.log10(class_obj.Pi) + 1,
+                                self.li * 100,
+                                np.log10(self.rhoi) - 3,
+                                np.log10(self.Pi) + 1,
                             ]
                         )
                     ),
@@ -635,9 +625,7 @@ def classify_and_save_state(
             else:
                 np.savetxt(
                     path_name + "/" + file_name + "_SI_" + str(i) + ".txt",
-                    np.transpose(
-                        np.array([class_obj.li, class_obj.rhoi, class_obj.Pi])
-                    ),
+                    np.transpose(np.array([self.li, self.rhoi, self.Pi])),
                 )
 
         elif what_save == "none":
@@ -649,10 +637,10 @@ def classify_and_save_state(
             )
 
         # Update storage arrays:
-        rho_maxs.append(np.max(class_obj.rhoi))
+        rho_maxs.append(np.max(self.rhoi))
 
         # Verbosity output:
-        verbosity = class_obj.opts["verbosity"]
+        verbosity = self.opts["verbosity"]
         if verbosity > 0:
             header = " " * 9
             mine = ""
@@ -661,8 +649,8 @@ def classify_and_save_state(
             for j, cost_j in enumerate(costJs):
                 label = f"     J{2 * (j + 1)}     "
                 header += paint(label, "good" if abs(cost_j) < 1e0 else "warn")
-                mine += f"{class_obj.Js[j + 1]:.5e} "
-                target += f"{class_obj.opts['target_Js'][j]:.5e} "
+                mine += f"{self.Js[j + 1]:.5e} "
+                target += f"{self.opts['target_Js'][j]:.5e} "
 
             say(
                 verbosity,

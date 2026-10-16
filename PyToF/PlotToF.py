@@ -197,7 +197,7 @@ def _default_plot_autocorr():
 
 
 def plot_xy(
-    class_obj,
+    self,
     x,
     y,
     do_new_figure=True,
@@ -211,7 +211,7 @@ def plot_xy(
 
     Parameters
     ----------
-    class_obj:      PyToF object, does not need to be provided by the user,
+    self:      PyToF object, does not need to be provided by the user,
                     see ClassToF.py.
     x, y:           Integer indices selecting which quantities to plot along x
                     and y axes.
@@ -236,17 +236,17 @@ def plot_xy(
         4
         / 3
         * np.pi
-        * (class_obj.li**3 - np.append(class_obj.li[1:], 0) ** 3)
-        * class_obj.rhoi
+        * (self.li**3 - np.append(self.li[1:], 0) ** 3)
+        * self.rhoi
     )
     summed_m = np.array([sum(shell_m[i:]) for i in range(len(shell_m))])
 
     # Data for plotting:
     xy = [
-        class_obj.li / class_obj.li[0],
+        self.li / self.li[0],
         summed_m / summed_m[0],
-        class_obj.rhoi / 1000,
-        class_obj.Pi / 1e5,
+        self.rhoi / 1000,
+        self.Pi / 1e5,
     ]
     label_xy = [
         r"average $r/R$",
@@ -295,27 +295,27 @@ def plot_xy(
 
     # Create new figure if needed:
     if do_new_figure:
-        class_obj.fig, [class_obj.ax, class_obj.cax] = plt.subplots(
+        self.fig, [self.ax, self.cax] = plt.subplots(
             1, 2, layout="constrained", gridspec_kw={"width_ratios": [1, 0.01]}
         )
-        class_obj.cax.axis("off")
-        class_obj.ax.set_xlabel(label_xy[x])
-        class_obj.ax.set_ylabel(label_xy[y])
-        class_obj.ax.set_xscale(scale_xy[x])
-        class_obj.ax.set_yscale(scale_xy[y])
+        self.cax.axis("off")
+        self.ax.set_xlabel(label_xy[x])
+        self.ax.set_ylabel(label_xy[y])
+        self.ax.set_xscale(scale_xy[x])
+        self.ax.set_yscale(scale_xy[y])
         if x == 2 or x == 3:
-            class_obj.ax.invert_xaxis()
+            self.ax.invert_xaxis()
 
         # Add inset plot within figure if needed:
         if inset_plot_xy is not None:
-            class_obj.ax_ins = inset_axes(
-                class_obj.ax,
+            self.ax_ins = inset_axes(
+                self.ax,
                 width=inset_plot_xy.width,
                 height=inset_plot_xy.height,
                 loc=inset_plot_xy.loc,
                 borderpad=inset_plot_xy.borderpad,
                 bbox_to_anchor=inset_plot_xy.bbox_to_anchor,
-                bbox_transform=class_obj.ax.transAxes,
+                bbox_transform=self.ax.transAxes,
                 axes_kwargs={
                     "xlim": inset_plot_xy.xlim,
                     "ylim": inset_plot_xy.ylim,
@@ -323,13 +323,13 @@ def plot_xy(
                     "yscale": scale_xy[inset_plot_xy.y],
                 },
             )
-            class_obj.ax_ins.set_xlabel(label_xy[inset_plot_xy.x])
-            class_obj.ax_ins.set_ylabel(label_xy[inset_plot_xy.y])
+            self.ax_ins.set_xlabel(label_xy[inset_plot_xy.x])
+            self.ax_ins.set_ylabel(label_xy[inset_plot_xy.y])
             if inset_plot_xy.x == 2 or inset_plot_xy.x == 3:
-                class_obj.ax_ins.invert_xaxis()
+                self.ax_ins.invert_xaxis()
 
     # Do the plotting:
-    class_obj.ax.plot(
+    self.ax.plot(
         xy[x],
         xy[y],
         color=opts["color"],
@@ -340,7 +340,7 @@ def plot_xy(
 
     # Do the plotting (inset plot):
     if inset_plot_xy is not None:
-        class_obj.ax_ins.plot(
+        self.ax_ins.plot(
             xy[inset_plot_xy.x],
             xy[inset_plot_xy.y],
             color=opts["color"],
@@ -353,7 +353,7 @@ def plot_xy(
     if literature is not None:
         for i in range(len(literature_xys)):
             # Do the plotting:
-            class_obj.ax.plot(
+            self.ax.plot(
                 literature_xys[i][x],
                 literature_xys[i][y],
                 color=literature.colors[i],
@@ -364,7 +364,7 @@ def plot_xy(
 
             # Do the plotting (inset plot):
             if inset_plot_xy is not None:
-                class_obj.ax_ins.plot(
+                self.ax_ins.plot(
                     literature_xys[i][inset_plot_xy.x],
                     literature_xys[i][inset_plot_xy.y],
                     linestyle=literature.linestyles[i],
@@ -374,17 +374,17 @@ def plot_xy(
 
     # Add a colorbar if needed:
     if colorbar is not None:
-        gs = class_obj.ax.get_subplotspec().get_gridspec()
+        gs = self.ax.get_subplotspec().get_gridspec()
         gs.set_width_ratios([1, colorbar.width])
-        class_obj.cax.axis("on")
-        class_obj.fig.set_size_inches(
+        self.cax.axis("on")
+        self.fig.set_size_inches(
             mpl_opts["figure.figsize"][0] * colorbar.stretch,
             mpl_opts["figure.figsize"][1],
             forward=True,
         )
 
-        cbar = class_obj.fig.colorbar(
-            colorbar.mappable, cax=class_obj.cax, orientation="vertical"
+        cbar = self.fig.colorbar(
+            colorbar.mappable, cax=self.cax, orientation="vertical"
         )
         cbar.set_label(colorbar.label)
         cbar.ax.tick_params(
@@ -415,7 +415,7 @@ def plot_xy(
 
     # Do the legend if needed:
     if opts["do_legend"]:
-        class_obj.ax.legend(
+        self.ax.legend(
             loc=opts["loc_legend"],
             ncol=opts["ncol_legend"],
             frameon=opts["frameon_legend"],
@@ -424,14 +424,14 @@ def plot_xy(
 
     # Save the plot if needed:
     if opts["do_save"]:
-        class_obj.fig.savefig(
+        self.fig.savefig(
             opts["path_name"] + "/" + opts["fig_name"] + "." + opts["format"],
             format=opts["format"],
             transparent=opts["transparent"],
         )
 
 
-def plot_shape(class_obj, **kwargs):
+def plot_shape(self, **kwargs):
     """
     Plot the internal density structure and shape of a rotating spheroid.
 
@@ -440,7 +440,7 @@ def plot_shape(class_obj, **kwargs):
 
     Parameters
     ----------
-    class_obj:      PyToF object, does not need to be provided by the user,
+    self:      PyToF object, does not need to be provided by the user,
                     see ClassToF.py.
     **kwargs:       Additional keyword arguments to override default plot
                     settings.
@@ -453,7 +453,7 @@ def plot_shape(class_obj, **kwargs):
 
     # Define coordinates:
     theta = np.linspace(0, 2 * np.pi, 1000)
-    r_l_mu = class_obj.get_r_l_mu(np.cos(theta))
+    r_l_mu = self.get_r_l_mu(np.cos(theta))
     N = np.shape(r_l_mu)[0]
 
     # Define variables for plotting:
@@ -462,11 +462,9 @@ def plot_shape(class_obj, **kwargs):
     Z = np.ones((N + 1, 1000))
 
     # Ensures a radius 0 entry is present:
-    X[:N, :] = r_l_mu / np.max(class_obj.li)
+    X[:N, :] = r_l_mu / np.max(self.li)
     Y *= theta / (2 * np.pi) * 360
-    Z[:N, :] = np.outer(
-        class_obj.rhoi / np.max(class_obj.rhoi), np.ones_like(theta)
-    )
+    Z[:N, :] = np.outer(self.rhoi / np.max(self.rhoi), np.ones_like(theta))
 
     # Create new figure:
     fig, axs = plt.subplots(
@@ -503,9 +501,7 @@ def plot_shape(class_obj, **kwargs):
         length=mpl_opts["ytick.minor.size"],
     )
     cbar.set_label(
-        r"$\rho$ ["
-        + str(np.round(np.max(class_obj.rhoi / 1000), 2))
-        + " g/cm$^3$]"
+        r"$\rho$ [" + str(np.round(np.max(self.rhoi / 1000), 2)) + " g/cm$^3$]"
     )
     axs[0].set_yticks(
         [0, 45, 90, 135, 180, 225, 270, 315, 360],
@@ -568,9 +564,7 @@ def plot_shape(class_obj, **kwargs):
         length=mpl_opts["ytick.minor.size"],
     )
     cbar.set_label(
-        r"$\rho$ ["
-        + str(np.round(np.max(class_obj.rhoi / 1000), 2))
-        + " g/cm$^3$]"
+        r"$\rho$ [" + str(np.round(np.max(self.rhoi / 1000), 2)) + " g/cm$^3$]"
     )
     axs[0].set_theta_zero_location("N")
     axs[0].set_thetagrids(
@@ -600,13 +594,13 @@ def plot_shape(class_obj, **kwargs):
         )
 
 
-def plot_ss(class_obj, **kwargs):
+def plot_ss(self, **kwargs):
     """
     Plot normalized figure functions (spherical shape coefficients).
 
     Parameters
     ----------
-    class_obj:      PyToF object, does not need to be provided by the user,
+    self:      PyToF object, does not need to be provided by the user,
                     see ClassToF.py.
     **kwargs:       Additional keyword arguments to override default plot
                     settings.
@@ -618,16 +612,16 @@ def plot_ss(class_obj, **kwargs):
     opts = {**_default_plot_ss(), **kwargs}
 
     # Create new figure:
-    class_obj.fig, class_obj.ax = plt.subplots(layout="constrained")
+    self.fig, self.ax = plt.subplots(layout="constrained")
 
     # Get data for plotting:
-    ss = class_obj.ss
+    ss = self.ss
 
     handles = []
     labels = []
     for i in range(len(ss)):
         if i != 0:
-            x = np.append(class_obj.li / class_obj.li[0], 0)
+            x = np.append(self.li / self.li[0], 0)
             y = np.append(
                 np.flip(ss[i] / np.max(abs(ss[i]))),
                 ss[i][0] / np.max(abs(ss[i])),
@@ -635,7 +629,7 @@ def plot_ss(class_obj, **kwargs):
 
             # Do the plotting:
             val, exp = f"{np.max(abs(ss[i])):.1e}".split("e")
-            class_obj.ax.plot(
+            self.ax.plot(
                 x,
                 y,
             )
@@ -651,12 +645,12 @@ def plot_ss(class_obj, **kwargs):
             )
 
     # Do the labeling:
-    class_obj.ax.set_xlabel(r"average $r/R$")
-    class_obj.ax.set_ylabel(r"normalised figure functions")
+    self.ax.set_xlabel(r"average $r/R$")
+    self.ax.set_ylabel(r"normalised figure functions")
 
     # Do the legend if needed:
     if opts["do_legend"]:
-        class_obj.ax.legend(
+        self.ax.legend(
             handles,
             labels,
             handletextpad=0.3,
@@ -672,7 +666,7 @@ def plot_ss(class_obj, **kwargs):
 
     # Save the plot if needed:
     if opts["do_save"]:
-        class_obj.fig.savefig(
+        self.fig.savefig(
             opts["path_name"] + "/" + opts["fig_name"] + "." + opts["format"],
             format=opts["format"],
             transparent=opts["transparent"],
@@ -680,7 +674,7 @@ def plot_ss(class_obj, **kwargs):
 
 
 def plot_state_xy(
-    class_obj,
+    self,
     x,
     y,
     state,
@@ -696,7 +690,7 @@ def plot_state_xy(
 
     Parameters
     ----------
-    class_obj:      PyToF object, does not need to be provided by the user,
+    self:      PyToF object, does not need to be provided by the user,
                     see ClassToF.py.
     x, y:           Integer indices selecting which quantities to plot along x
                     and y axes.
@@ -742,14 +736,10 @@ def plot_state_xy(
     for i in idxs:
         # Call cost functions depending on what model was used:
         if what_model == "baro":
-            costJs = class_obj.baro_cost_function(
-                state[i, :], return_sum=False
-            )
+            costJs = self.baro_cost_function(state[i, :], return_sum=False)
 
         elif what_model == "dens":
-            costJs = class_obj.dens_cost_function(
-                state[i, :], return_sum=False
-            )
+            costJs = self.dens_cost_function(state[i, :], return_sum=False)
 
         else:
             raise KeyError(
@@ -800,7 +790,7 @@ def plot_state_xy(
 
         # Call plot_xy():
         plot_xy(
-            class_obj,
+            self,
             x,
             y,
             do_new_figure=do_new_figure_arg,
@@ -812,7 +802,7 @@ def plot_state_xy(
 
 
 def plot_state_corr_xy(
-    class_obj,
+    self,
     x,
     y,
     state,
@@ -831,7 +821,7 @@ def plot_state_corr_xy(
 
     Parameters
     ----------
-    class_obj:      PyToF object, does not need to be provided by the user,
+    self:      PyToF object, does not need to be provided by the user,
                     see ClassToF.py.
     x, y:           Integer indices selecting which quantities to plot along x
                     and y axes.
@@ -886,14 +876,10 @@ def plot_state_corr_xy(
     for i in idxs:
         # Call cost functions depending on what model was used:
         if what_model == "baro":
-            costJs = class_obj.baro_cost_function(
-                state[i, :], return_sum=False
-            )
+            costJs = self.baro_cost_function(state[i, :], return_sum=False)
 
         elif what_model == "dens":
-            costJs = class_obj.dens_cost_function(
-                state[i, :], return_sum=False
-            )
+            costJs = self.dens_cost_function(state[i, :], return_sum=False)
 
         else:
             raise KeyError(
@@ -918,8 +904,8 @@ def plot_state_corr_xy(
                 j += 1
 
         # Save results:
-        Js_list.append(class_obj.Js)
-        Js_err_list.append(class_obj.Js_errors)
+        Js_list.append(self.Js)
+        Js_err_list.append(self.Js_errors)
         color_list.append(color)
 
     # Convert storage lists to arrays:
@@ -1097,10 +1083,10 @@ def plot_state_corr_xy(
     # Plot target gravitational moments:
     if (x < len(Js_list[0, :])) and (y < len(Js_list[0, :])):
         ax.errorbar(
-            class_obj.opts["target_Js"][x - 1] / 10**x_scale,
-            class_obj.opts["target_Js"][y - 1] / 10**y_scale,
-            xerr=class_obj.opts["sigma_Js"][x - 1] / 10**x_scale,
-            yerr=class_obj.opts["sigma_Js"][y - 1] / 10**y_scale,
+            self.opts["target_Js"][x - 1] / 10**x_scale,
+            self.opts["target_Js"][y - 1] / 10**y_scale,
+            xerr=self.opts["sigma_Js"][x - 1] / 10**x_scale,
+            yerr=self.opts["sigma_Js"][y - 1] / 10**y_scale,
             color="k",
             fmt="o",
             capsize=3.0,
