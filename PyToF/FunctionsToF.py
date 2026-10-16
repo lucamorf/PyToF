@@ -337,40 +337,42 @@ def get_Js_errors(class_obj):
         return 0
 
     if class_obj.opts["use_simpson"]:
-        print(
-            c.INFO
-            + "The option"
-            + c.ENDC
-            + " use_simpson"
-            + c.INFO
-            + " is"
-            + c.NUMB
-            + " True"
-            + c.INFO
-            + ". This ensures the highest possible accuracy."
-            + c.ENDC
-        )
+        if class_obj.opts["verbosity"] > 0:
+            print(
+                c.INFO
+                + "The option"
+                + c.ENDC
+                + " use_simpson"
+                + c.INFO
+                + " is"
+                + c.NUMB
+                + " True"
+                + c.INFO
+                + ". This ensures the highest possible accuracy."
+                + c.ENDC
+            )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
     else:
-        print(
-            c.INFO
-            + "The option"
-            + c.ENDC
-            + " use_simpson"
-            + c.INFO
-            + " is"
-            + c.NUMB
-            + " False"
-            + c.INFO
-            + ". This yields a reduced accuracy. PyToF may have set this"
-            + " flag to"
-            + c.NUMB
-            + " False"
-            + c.INFO
-            + " without user input to mitigate stability issues."
-            + c.ENDC
-        )
+        if class_obj.opts["verbosity"] > 0:
+            print(
+                c.INFO
+                + "The option"
+                + c.ENDC
+                + " use_simpson"
+                + c.INFO
+                + " is"
+                + c.NUMB
+                + " False"
+                + c.INFO
+                + ". This yields a reduced accuracy. PyToF may have set this"
+                + " flag to"
+                + c.NUMB
+                + " False"
+                + c.INFO
+                + " without user input to mitigate stability issues."
+                + c.ENDC
+            )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
 
@@ -553,7 +555,10 @@ def get_Kn(class_obj, n, bs=None):
 
     # Solve first part of the differential equation:
     sol = scipy.integrate.solve_ivp(
-        rhs, (bs[0], bs[1]), y0, max_step=(R - r0) / class_obj.opts["N"]
+        rhs, 
+        (bs[0], bs[1]),
+        y0, 
+        max_step=(R - r0) / class_obj.opts["N"],
     )
 
     # Store solutions:
@@ -583,7 +588,7 @@ def get_Kn(class_obj, n, bs=None):
         y0 = [
             T_n[-1],
             T_n_prime[-1]
-            + 4
+            - 4
             * np.pi
             * class_obj.opts["G"]
             * delta_rho
@@ -612,7 +617,7 @@ def get_Kn(class_obj, n, bs=None):
     T_n_prime *= scale
 
     # Calculate Love function:
-    K_n = ((T_n / R / U_prime(R)) - (r / R) ** n)
+    K_n = (T_n / R / U_prime(R)) * (R / r) ** n - 1
 
     return r, T_n, K_n
 
