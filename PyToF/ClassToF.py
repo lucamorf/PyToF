@@ -24,6 +24,7 @@ from PyToF.MonteCarloToF import (
     dens_cost_function,
     run_baro_MC,
     run_dens_MC,
+    run_mcmc,
     set_check_param,
 )
 from PyToF.options import Options
@@ -88,6 +89,7 @@ class ToF:
     set_check_param = set_check_param
     baro_cost_function = baro_cost_function
     dens_cost_function = dens_cost_function
+    run_mcmc = run_mcmc
     run_baro_MC = run_baro_MC
     run_dens_MC = run_dens_MC
     classify_and_save_state = classify_and_save_state
