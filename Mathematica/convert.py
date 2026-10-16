@@ -4,6 +4,9 @@ import re
 import numpy as np
 
 def transform_expression(expr):
+    # Write integers beyond the int64 range as floats. With NumPy 1.x, a
+    # Python int > 2**63 times a float array silently becomes an object array.
+    expr = re.sub(r"(?<![\d.eE_])(\d{19,})(?![\d.eE])", r"\1.0", expr)
     # Replace exponentiation for s-variables: e.g., s2**2 -> s2h2
     expr = re.sub(r"(s\d+)\*\*(\d+)", r"\1h\2", expr)
     # Replace exponentiation for z: e.g., z**2 -> zh2
