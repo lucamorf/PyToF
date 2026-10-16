@@ -58,3 +58,13 @@ def test_differential_rotation_changes_the_solution():
     rigid = jupiter_polytrope(7, 256)
     differential = jupiter_polytrope(7, 256, alphas=ALPHAS_WH16)
     assert abs(differential.Js[1] / rigid.Js[1] - 1) > 1e-5
+
+
+def test_orders_7_and_10_agree_with_differential_rotation():
+    # Without differential rotation orders 7 and 10 agree to ~1e-9 in J2 and
+    # J4. Dropping any differential-rotation term at one order breaks this
+    # (an order-10 A0 term was once missing and shifted J2 by 1e-4).
+    o7 = jupiter_polytrope(7, N=512, alphas=ALPHAS_WH16)
+    o10 = jupiter_polytrope(10, N=512, alphas=ALPHAS_WH16)
+    rel = np.abs(o10.Js[1:3] / o7.Js[1:3] - 1)
+    assert np.all(rel < 1e-6), rel

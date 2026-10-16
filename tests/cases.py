@@ -162,6 +162,9 @@ GOLDEN_CASES = {
     "jupiter_o7_diffrot": lambda: jupiter_polytrope(
         7, 256, alphas=ALPHAS_WH16
     ),
+    "jupiter_o10_diffrot": lambda: jupiter_polytrope(
+        10, 256, alphas=ALPHAS_WH16
+    ),
     "spheroid_o4": lambda: uniform_sphere(N=256, period=24 * 3600, order=4),
     "density_o4": _density_case,
     "atmosphere_o4": _atmosphere_case,

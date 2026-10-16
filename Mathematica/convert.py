@@ -1,3 +1,11 @@
+# NOTE: the exported expressions are *bare* right-hand sides. When pasting them
+# into PyToF/AlgoToF.py each one needs its assignment written by hand, e.g.
+#     A2 += <contents of A2+s2S0_only_DR.txt>
+#     A0 += <contents of A0_only_DR.txt>
+# A missing prefix computes the value and silently discards it (this happened
+# for A0 at order 10 until it was caught). tests/test_code_hygiene.py fails if
+# any module contains a discarded expression.
+
 import os
 import glob
 import re
