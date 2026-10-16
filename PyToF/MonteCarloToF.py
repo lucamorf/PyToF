@@ -59,8 +59,8 @@ def _check_phys(class_obj):
         return True
 
     # There should be no density or pressure values above the given maxima:
-    elif (np.max(class_obj.rhoi) > class_obj.opts["rho_MAX"]) or (
-        np.max(class_obj.Pi) > class_obj.opts["P_MAX"]
+    elif (np.max(class_obj.rhoi) > class_obj.opts["rho_max"]) or (
+        np.max(class_obj.Pi) > class_obj.opts["P_max"]
     ):
         say(
             class_obj.opts["verbosity"],
@@ -94,7 +94,7 @@ def set_check_param(class_obj, fun):
 def baro_cost_function(class_obj, param, return_sum=True):
     """
     Calls relax_to_barotrope() and returns values specifying how far off the
-    calculated Js are from opts['Target_Js'] given opts['Sigma_Js'].
+    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
 
     param: Array of parameters for the barotrope function.
     return_sum: If True, returns the sum of the costs for all Js. If False,
@@ -107,7 +107,7 @@ def baro_cost_function(class_obj, param, return_sum=True):
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Reset to initial conditions:
     class_obj._set_IC()
@@ -124,23 +124,23 @@ def baro_cost_function(class_obj, param, return_sum=True):
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Infinite cost if the result is unphysical:
-    if _check_phys(class_obj) or it == class_obj.opts["MaxIterBar"]:
+    if _check_phys(class_obj) or it == class_obj.opts["max_iter_barotrope"]:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Calculate the cost, i.e. the deviation from the target values:
-    costJs = np.zeros_like(class_obj.opts["Target_Js"])
+    costJs = np.zeros_like(class_obj.opts["target_Js"])
 
     for i in range(len(costJs)):
         costJs[i] = (
-            -((class_obj.Js[i + 1] - class_obj.opts["Target_Js"][i]) ** 2)
-            / class_obj.opts["Sigma_Js"][i] ** 2
+            -((class_obj.Js[i + 1] - class_obj.opts["target_Js"][i]) ** 2)
+            / class_obj.opts["sigma_Js"][i] ** 2
         )
 
     # Return the cost value:
@@ -154,7 +154,7 @@ def baro_cost_function(class_obj, param, return_sum=True):
 def dens_cost_function(class_obj, param, return_sum=True):
     """
     Calls relax_to_barotrope() and returns values specifying how far off the
-    calculated Js are from opts['Target_Js'] given opts['Sigma_Js'].
+    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
 
     param: Array of parameters for the density function.
     return_sum: If True, returns the sum of the costs for all Js. If False,
@@ -167,7 +167,7 @@ def dens_cost_function(class_obj, param, return_sum=True):
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Reset to initial conditions:
     class_obj._set_IC()
@@ -189,23 +189,23 @@ def dens_cost_function(class_obj, param, return_sum=True):
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Infinite cost if the result is unphysical:
-    if _check_phys(class_obj) or it == class_obj.opts["MaxIterDen"]:
+    if _check_phys(class_obj) or it == class_obj.opts["max_iter_density"]:
         if return_sum:
             return -np.inf
 
         else:
-            return [-np.inf] * len(class_obj.opts["Target_Js"])
+            return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Calculate the cost, i.e. the deviation from the target values:
-    costJs = np.zeros_like(class_obj.opts["Target_Js"])
+    costJs = np.zeros_like(class_obj.opts["target_Js"])
 
     for i in range(len(costJs)):
         costJs[i] = (
-            -((class_obj.Js[i + 1] - class_obj.opts["Target_Js"][i]) ** 2)
-            / class_obj.opts["Sigma_Js"][i] ** 2
+            -((class_obj.Js[i + 1] - class_obj.opts["target_Js"][i]) ** 2)
+            / class_obj.opts["sigma_Js"][i] ** 2
         )
 
     # Return the cost value:
@@ -273,7 +273,9 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
             continue
 
         # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(class_obj)) and it < class_obj.opts["MaxIterBar"]:
+        if (not _check_phys(class_obj)) and it < class_obj.opts[
+            "max_iter_barotrope"
+        ]:
             say(
                 class_obj.opts["verbosity"],
                 1,
@@ -427,7 +429,9 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
             continue
 
         # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(class_obj)) and it < class_obj.opts["MaxIterDen"]:
+        if (not _check_phys(class_obj)) and it < class_obj.opts[
+            "max_iter_density"
+        ]:
             say(
                 class_obj.opts["verbosity"],
                 1,
@@ -658,7 +662,7 @@ def classify_and_save_state(
                 label = f"     J{2 * (j + 1)}     "
                 header += paint(label, "good" if abs(cost_j) < 1e0 else "warn")
                 mine += f"{class_obj.Js[j + 1]:.5e} "
-                target += f"{class_obj.opts['Target_Js'][j]:.5e} "
+                target += f"{class_obj.opts['target_Js'][j]:.5e} "
 
             say(
                 verbosity,

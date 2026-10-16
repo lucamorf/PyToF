@@ -22,6 +22,8 @@ from dataclasses import MISSING, dataclass, field, fields
 
 import numpy as np
 
+from PyToF.messages import RenamedWarning, warn
+
 # Defaults follow the Jupiter benchmark of Wisdom & Hubbard (2016),
 # "Differential rotation in Jupiter: A comparison of methods", Icarus 267, 315.
 _G = 6.6738480e-11  # m^3 kg^-1 s^-2
@@ -40,6 +42,18 @@ _JS = [
     1.655948019619652e-11,
     -1.829544870258362e-12,
 ]
+
+# Options that were renamed. The old names keep working but warn.
+RENAMED = {
+    "MaxIterShape": "max_iter_shape",
+    "MaxIterUpdate": "max_iter_update",
+    "MaxIterBar": "max_iter_barotrope",
+    "MaxIterDen": "max_iter_density",
+    "Target_Js": "target_Js",
+    "Sigma_Js": "sigma_Js",
+    "rho_MAX": "rho_max",
+    "P_MAX": "P_max",
+}
 
 RADIUS_KINDS = ("equatorial", "mean", "polar")
 ORDERS = (4, 7, 10)
@@ -82,19 +96,19 @@ class Options:
     drho_tol: float = _option(
         1e-10, "Relative tolerance of the densities.", "numerics"
     )
-    MaxIterShape: int = _option(
+    max_iter_shape: int = _option(
         100, "Maximum iterations of relax_to_shape().", "numerics"
     )
-    MaxIterUpdate: int = _option(
+    max_iter_update: int = _option(
         100,
         "Maximum iterations of the density update (barotrope, atmosphere) "
         "within one step of relax_to_barotrope()/relax_to_density().",
         "numerics",
     )
-    MaxIterBar: int = _option(
+    max_iter_barotrope: int = _option(
         100, "Maximum iterations of relax_to_barotrope().", "numerics"
     )
-    MaxIterDen: int = _option(
+    max_iter_density: int = _option(
         100, "Maximum iterations of relax_to_density().", "numerics"
     )
     # -------------------------------------------------------------- output
@@ -135,16 +149,16 @@ class Options:
         "planet",
     )
     P0: float = _option(0, "Surface pressure in SI units.", "planet")
-    Target_Js: np.ndarray = _option(
+    target_Js: np.ndarray = _option(
         lambda: np.array(_JS),
         "Observed gravitational moments J2, J4, ... used by the cost "
         "function.",
         "planet",
         factory=True,
     )
-    Sigma_Js: np.ndarray = _option(
+    sigma_Js: np.ndarray = _option(
         lambda: np.array([np.spacing(j) for j in _JS]),
-        "1-sigma uncertainties of Target_Js.",
+        "1-sigma uncertainties of target_Js.",
         "planet",
         factory=True,
     )
@@ -156,10 +170,10 @@ class Options:
         factory=True,
     )
     # --------------------------------------------------------------- model
-    rho_MAX: float = _option(
+    rho_max: float = _option(
         2e4, "Largest physically acceptable density in SI units.", "model"
     )
-    P_MAX: float = _option(
+    P_max: float = _option(
         1e13, "Largest physically acceptable pressure in SI units.", "model"
     )
     baro_param_init: list = _option(
@@ -194,12 +208,37 @@ class Options:
     # ------------------------------------------------------------ creation
     @classmethod
     def from_kwargs(cls, **kwargs):
-        """Like ``Options(**kwargs)``, with a helpful unknown-name error."""
+        """Like ``Options(**kwargs)``, with helpful errors for bad names."""
 
-        for name in kwargs:
-            cls._check_name(name)
+        resolved = {}
+        for name, value in kwargs.items():
+            new_name = cls._resolve(name, stacklevel=4)
+            if new_name in resolved:
+                raise TypeError(
+                    f"{name!r} and {new_name!r} are the same option."
+                )
+            cls._check_name(new_name)
+            resolved[new_name] = value
 
-        return cls(**kwargs)
+        return cls(**resolved)
+
+    @classmethod
+    def _resolve(cls, name, stacklevel=3):
+        """Translate a renamed option to its new name (with a warning)."""
+
+        if name not in RENAMED:
+            return name
+
+        warn(
+            "The option {old!r} was renamed to {new!r}. The old name still "
+            "works but will be removed in a future version.",
+            RenamedWarning,
+            stacklevel=stacklevel,
+            old=name,
+            new=RENAMED[name],
+        )
+
+        return RENAMED[name]
 
     @classmethod
     def names(cls):
@@ -219,6 +258,7 @@ class Options:
 
     # ---------------------------------------------------------- validation
     def __setattr__(self, name, value):
+        name = self._resolve(name)
         self._check_name(name)
         validate = getattr(self, "_validate_" + name, None)
         if validate is not None:
@@ -255,7 +295,14 @@ class Options:
             )
 
     # ------------------------------------------------------- dict interface
+    def __getattr__(self, name):
+        # Only called if normal lookup failed: serves renamed options.
+        if name in RENAMED:
+            return getattr(self, self._resolve(name))
+        raise AttributeError(name)
+
     def __getitem__(self, name):
+        name = self._resolve(name)
         self._check_name(name)
         return getattr(self, name)
 
@@ -263,7 +310,7 @@ class Options:
         setattr(self, name, value)
 
     def __contains__(self, name):
-        return name in self.names()
+        return RENAMED.get(name, name) in self.names()
 
     def keys(self):
         return self.names()
@@ -272,7 +319,7 @@ class Options:
         return [(name, getattr(self, name)) for name in self.names()]
 
     def get(self, name, default=None):
-        return getattr(self, name) if name in self else default
+        return self[name] if name in self else default
 
     def copy(self):
         return copy.copy(self)

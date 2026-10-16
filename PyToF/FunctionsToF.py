@@ -244,17 +244,18 @@ def _apply_atmosphere(class_obj):
 
 def _warn_not_converged_drho(class_obj, drho):
     """
-    Warns that the densities did not converge within MaxIterUpdate iterations.
+    Warns that the densities did not converge within max_iter_update
+    iterations.
     """
 
     warn(
-        "drho = {drho:.0e} > {tol:.0e} = drho_tol after MaxIterUpdate = "
+        "drho = {drho:.0e} > {tol:.0e} = drho_tol after max_iter_update = "
         "{max_iter} iterations.",
         ConvergenceWarning,
         stacklevel=3,
         drho=drho,
         tol=class_obj.opts["drho_tol"],
-        max_iter=class_obj.opts["MaxIterUpdate"],
+        max_iter=class_obj.opts["max_iter_update"],
     )
 
 
@@ -640,7 +641,7 @@ def _relax_to_shape(class_obj, maxiter="default"):
     alphas = np.zeros(len(class_obj.opts["alphas"]))
 
     if maxiter == "default":
-        maxiter = class_obj.opts["MaxIterShape"]
+        maxiter = class_obj.opts["max_iter_shape"]
 
     # Convert barotropic differential rotation parameters to Theory of Figures
     # logic:
@@ -717,7 +718,7 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
                         consistent with the shape of the planet calculated by
                         PyToF
     maxiter:            Maximum number of iterations to perform. If "default",
-                        uses the class_obj.opts['MaxIterShape'] value.
+                        uses the class_obj.opts['max_iter_shape'] value.
     """
 
     out = _relax_to_shape(class_obj, maxiter)
@@ -742,8 +743,8 @@ def relax_to_barotrope(class_obj):
     """
     Calls relax_to_shape() and _update_densities_barotrope() until either the
     accuray given by class_obj.opts['dJ_tol'], class_obj.opts['drot_tol'] and
-    class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterBar'] is
-    reached.
+    class_obj.opts['drho_tol'] is fulfilled or
+    class_obj.opts['max_iter_barotrope'] is reached.
     """
 
     # Measure ToF performance:
@@ -758,7 +759,7 @@ def relax_to_barotrope(class_obj):
     IterBar = 1
 
     # Converge on gravitational moments:
-    while IterBar < class_obj.opts["MaxIterBar"]:
+    while IterBar < class_obj.opts["max_iter_barotrope"]:
         # Store old gravitational moment values:
         old_Js = class_obj.Js
 
@@ -771,7 +772,7 @@ def relax_to_barotrope(class_obj):
             )
 
         # Converge on densities:
-        while IterUpdate < class_obj.opts["MaxIterUpdate"]:
+        while IterUpdate < class_obj.opts["max_iter_update"]:
             # Store old values:
             old_rho = class_obj.rhoi
 
@@ -793,7 +794,7 @@ def relax_to_barotrope(class_obj):
         class_obj.bugfix_iter += 1
 
         # Warning if not converged:
-        if IterUpdate == class_obj.opts["MaxIterUpdate"]:
+        if IterUpdate == class_obj.opts["max_iter_update"]:
             _warn_not_converged_drho(class_obj, drho)
 
         # Call relax_to_shape():
@@ -831,8 +832,8 @@ def relax_to_barotrope(class_obj):
     toc = time.time()
 
     # Warning if not converged:
-    if IterBar == class_obj.opts["MaxIterBar"]:
-        _warn_not_converged(class_obj, drot, dJs, drho, "MaxIterBar")
+    if IterBar == class_obj.opts["max_iter_barotrope"]:
+        _warn_not_converged(class_obj, drot, dJs, drho, "max_iter_barotrope")
 
     # Verbosity output:
     say(
@@ -849,8 +850,8 @@ def relax_to_density(class_obj):
     """
     Calls relax_to_shape() until either the accuray given by
     class_obj.opts['dJ_tol'], class_obj.opts['drot_tol'] and
-    class_obj.opts['drho_tol'] is fulfilled or class_obj.opts['MaxIterDen'] is
-    reached.
+    class_obj.opts['drho_tol'] is fulfilled or
+    class_obj.opts['max_iter_density'] is reached.
     """
 
     # Measure ToF performance:
@@ -865,7 +866,7 @@ def relax_to_density(class_obj):
     IterDen = 1
 
     # Converge on gravitational moments:
-    while IterDen < class_obj.opts["MaxIterDen"]:
+    while IterDen < class_obj.opts["max_iter_density"]:
         # Store old gravitational moment values:
         old_Js = class_obj.Js
 
@@ -879,7 +880,7 @@ def relax_to_density(class_obj):
 
         # Converge on densities, this loop terminates after one iteration if no
         # atmosphere is provided:
-        while IterUpdate < class_obj.opts["MaxIterUpdate"]:
+        while IterUpdate < class_obj.opts["max_iter_update"]:
             # Store old values:
             old_rho = class_obj.rhoi
 
@@ -909,7 +910,7 @@ def relax_to_density(class_obj):
         class_obj.bugfix_iter += 1
 
         # Warning if not converged:
-        if IterUpdate == class_obj.opts["MaxIterUpdate"]:
+        if IterUpdate == class_obj.opts["max_iter_update"]:
             _warn_not_converged_drho(class_obj, drho)
 
         # Call relax_to_shape():
@@ -947,8 +948,8 @@ def relax_to_density(class_obj):
     toc = time.time()
 
     # Warning if not converged:
-    if IterDen == class_obj.opts["MaxIterDen"]:
-        _warn_not_converged(class_obj, drot, dJs, drho, "MaxIterDen")
+    if IterDen == class_obj.opts["max_iter_density"]:
+        _warn_not_converged(class_obj, drot, dJs, drho, "max_iter_density")
 
     # Verbosity output:
     say(

@@ -21,8 +21,8 @@ def mc_model():
         order=4,
         R_ref=71492000,
         baro_param_init=[1.0],
-        Target_Js=np.array([1.3988e-2, -5.318e-4]),
-        Sigma_Js=np.array([1e-4, 1e-5]),
+        target_Js=np.array([1.3988e-2, -5.318e-4]),
+        sigma_Js=np.array([1e-4, 1e-5]),
     )
     X.set_barotrope(_barotrope)
     X.set_check_param(_check_param)

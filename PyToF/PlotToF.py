@@ -1097,10 +1097,10 @@ def plot_state_corr_xy(
     # Plot target gravitational moments:
     if (x < len(Js_list[0, :])) and (y < len(Js_list[0, :])):
         ax.errorbar(
-            class_obj.opts["Target_Js"][x - 1] / 10**x_scale,
-            class_obj.opts["Target_Js"][y - 1] / 10**y_scale,
-            xerr=class_obj.opts["Sigma_Js"][x - 1] / 10**x_scale,
-            yerr=class_obj.opts["Sigma_Js"][y - 1] / 10**y_scale,
+            class_obj.opts["target_Js"][x - 1] / 10**x_scale,
+            class_obj.opts["target_Js"][y - 1] / 10**y_scale,
+            xerr=class_obj.opts["sigma_Js"][x - 1] / 10**x_scale,
+            yerr=class_obj.opts["sigma_Js"][y - 1] / 10**y_scale,
             color="k",
             fmt="o",
             capsize=3.0,

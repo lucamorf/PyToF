@@ -107,13 +107,13 @@ def test_normal_run_issues_no_warnings():
 
 def test_shape_not_converging_warns():
     with pytest.warns(ConvergenceWarning, match="dJ_tol"):
-        uniform_sphere(N=128, period=24 * 3600, MaxIterShape=1)
+        uniform_sphere(N=128, period=24 * 3600, max_iter_shape=1)
 
 
 def test_barotrope_not_converging_warns_and_names_the_limit():
-    X = ClassToF.ToF(N=64, order=4, R_ref=71492000, MaxIterBar=3)
+    X = ClassToF.ToF(N=64, order=4, R_ref=71492000, max_iter_barotrope=3)
     X.set_barotrope(polytrope_n1)
-    with pytest.warns(ConvergenceWarning, match="MaxIterBar = 3"):
+    with pytest.warns(ConvergenceWarning, match="max_iter_barotrope = 3"):
         X.relax_to_barotrope()
 
 

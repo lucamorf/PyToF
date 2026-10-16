@@ -33,7 +33,14 @@ import string
 import sys
 import warnings
 
-__all__ = ["ConvergenceWarning", "PyToFWarning", "paint", "say", "warn"]
+__all__ = [
+    "ConvergenceWarning",
+    "PyToFWarning",
+    "RenamedWarning",
+    "paint",
+    "say",
+    "warn",
+]
 
 _RESET = "\033[0m"
 _NUMBER = "\033[96m"
@@ -50,6 +57,13 @@ class PyToFWarning(UserWarning):
 
 class ConvergenceWarning(PyToFWarning):
     """An iterative procedure did not reach the requested tolerance."""
+
+
+class RenamedWarning(PyToFWarning, FutureWarning):
+    """
+    A name was changed. Being a FutureWarning it is shown by default, also
+    outside of ``__main__`` (DeprecationWarnings are hidden for most code).
+    """
 
 
 def _use_colour(stream):

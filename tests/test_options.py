@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from PyToF import ClassToF
+from PyToF.messages import RenamedWarning
 from PyToF.options import Options
 from tests.cases import jupiter_polytrope
 
@@ -18,15 +19,15 @@ def test_defaults_are_the_wisdom_hubbard_jupiter():
     assert opts["order"] == 4
     assert opts["R_phys"] == [71492000, "equatorial"]
     assert opts["M_phys"] == 126686536.1 * (1000) ** 3 / 6.6738480e-11
-    assert opts["Target_Js"][0] == 1.398851089834702e-2
+    assert opts["target_Js"][0] == 1.398851089834702e-2
     assert opts["alphas"].shape == (12,)
 
 
 def test_array_defaults_are_not_shared_between_instances():
     a, b = Options(), Options()
-    a["Target_Js"][0] = 0.0
+    a["target_Js"][0] = 0.0
     a["R_phys"][0] = 1.0
-    assert b["Target_Js"][0] != 0.0
+    assert b["target_Js"][0] != 0.0
     assert b["R_phys"][0] == 71492000
 
 
@@ -150,3 +151,68 @@ def test_every_option_is_documented_and_grouped():
 
     for f in fields(Options):
         assert f.metadata["doc"] and f.metadata["group"], f.name
+
+
+# ---------------------------------------------------------- renamed options
+
+RENAMED = {
+    "MaxIterShape": "max_iter_shape",
+    "MaxIterUpdate": "max_iter_update",
+    "MaxIterBar": "max_iter_barotrope",
+    "MaxIterDen": "max_iter_density",
+    "Target_Js": "target_Js",
+    "Sigma_Js": "sigma_Js",
+    "rho_MAX": "rho_max",
+    "P_MAX": "P_max",
+}
+
+
+@pytest.mark.parametrize("old, new", RENAMED.items())
+def test_old_option_names_still_work_but_warn(old, new):
+    opts = Options()
+
+    with pytest.warns(RenamedWarning, match=new) as record:
+        value = opts[old]
+    assert record[0].filename == __file__  # points at the user's line
+    np.testing.assert_array_equal(value, opts[new])
+
+    with pytest.warns(RenamedWarning):
+        opts[old] = opts[new]
+
+    with pytest.warns(RenamedWarning):
+        getattr(opts, old)
+
+
+def test_old_names_work_as_constructor_keywords():
+    with pytest.warns(RenamedWarning, match="max_iter_barotrope") as record:
+        X = ClassToF.ToF(N=64, MaxIterBar=7)
+    assert record[0].filename == __file__
+    assert X.opts["max_iter_barotrope"] == 7
+
+
+def test_setting_an_old_name_changes_the_new_option():
+    opts = Options()
+    with pytest.warns(RenamedWarning):
+        opts["MaxIterShape"] = 5
+    assert opts["max_iter_shape"] == 5
+
+
+def test_old_and_new_name_together_are_rejected():
+    with pytest.warns(RenamedWarning):
+        with pytest.raises(TypeError, match="same option"):
+            Options.from_kwargs(MaxIterBar=3, max_iter_barotrope=4)
+
+
+def test_membership_accepts_old_names_quietly():
+    assert "MaxIterBar" in Options()
+    assert "NoSuchOption" not in Options()
+
+
+def test_new_names_do_not_warn():
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        opts = Options.from_kwargs(max_iter_barotrope=3, target_Js=[1.0])
+        opts["rho_max"] = 1e4
+        assert opts.max_iter_barotrope == 3
