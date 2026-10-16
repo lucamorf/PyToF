@@ -5,6 +5,8 @@
 
 import multiprocessing
 import os
+from collections.abc import Callable
+from typing import NamedTuple
 
 import emcee
 import numpy as np
@@ -91,48 +93,92 @@ def set_check_param(self, fun):
     self.check_param = fun
 
 
-def baro_cost_function(self, param, return_sum=True):
+class _Model(NamedTuple):
     """
-    Calls relax_to_barotrope() and returns values specifying how far off the
-    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
+    What differs between the barotrope model and the density model.
 
-    param: Array of parameters for the barotrope function.
-    return_sum: If True, returns the sum of the costs for all Js. If False,
-                returns an array of costs for each J separately.
+    param_init:     Option holding the starting values of the parameters.
+    param_calc:     ToF attribute holding the current parameters.
+    relax:          ToF method relaxing the model to hydrostatic equilibrium.
+    max_iter:       Option limiting the iterations of that method.
+    prepare:        Function(tof, param) run after reset(), before relaxing.
     """
 
-    # Infinite cost if the parameters are out of bounds:
-    if self.check_param(param):
-        if return_sum:
-            return -np.inf
+    param_init: str
+    param_calc: str
+    relax: str
+    max_iter: str
+    prepare: Callable
 
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
+
+def _prepare_barotrope(self, param):
+    # The densities follow from the barotrope while relaxing.
+    pass
+
+
+def _prepare_density(self, param):
+    # Get densities according to self.density_function():
+    self.rhoi = self.density_function(
+        self.li, self.opts["M_phys"], param=param
+    )
+
+
+_BAROTROPE = _Model(
+    "baro_param_init",
+    "baro_param_calc",
+    "relax_to_barotrope",
+    "max_iter_barotrope",
+    _prepare_barotrope,
+)
+
+_DENSITY = _Model(
+    "dens_param_init",
+    "dens_param_calc",
+    "relax_to_density",
+    "max_iter_density",
+    _prepare_density,
+)
+
+
+def _reset_and_relax(self, model, param):
+    """
+    Resets the ToF object, applies the model parameters and relaxes. Returns
+    the number of iterations; raises ValueError for unphysical parameters.
+    """
 
     # Reset to initial conditions:
     self.reset()
 
-    # Update the internal parameters:
-    self.baro_param_calc = param
+    model.prepare(self, param)
 
-    # Call relax_to_barotrope():
+    # Update the internal parameters:
+    setattr(self, model.param_calc, param)
+
+    return getattr(self, model.relax)()
+
+
+def _cost(self, model, param, return_sum):
+    """Shared implementation of baro_cost_function and dens_cost_function."""
+
+    def infinite_cost():
+        if return_sum:
+            return -np.inf
+
+        return [-np.inf] * len(self.opts["target_Js"])
+
+    # Infinite cost if the parameters are out of bounds:
+    if self.check_param(param):
+        return infinite_cost()
+
     try:
-        it = self.relax_to_barotrope()
+        it = _reset_and_relax(self, model, param)
 
     except ValueError:
-        if return_sum:
-            return -np.inf
-
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
+        return infinite_cost()
 
     # Infinite cost if the result is unphysical:
-    if _check_phys(self) or it == self.opts["max_iter_barotrope"]:
-        if return_sum:
-            return -np.inf
-
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
+    if _check_phys(self) or it == self.opts[model.max_iter]:
+        return infinite_cost()
 
     # Calculate the cost, i.e. the deviation from the target values:
     costJs = np.zeros_like(self.opts["target_Js"])
@@ -149,6 +195,19 @@ def baro_cost_function(self, param, return_sum=True):
 
     else:
         return costJs
+
+
+def baro_cost_function(self, param, return_sum=True):
+    """
+    Calls relax_to_barotrope() and returns values specifying how far off the
+    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
+
+    param: Array of parameters for the barotrope function.
+    return_sum: If True, returns the sum of the costs for all Js. If False,
+                returns an array of costs for each J separately.
+    """
+
+    return _cost(self, _BAROTROPE, param, return_sum)
 
 
 def dens_cost_function(self, param, return_sum=True):
@@ -161,59 +220,7 @@ def dens_cost_function(self, param, return_sum=True):
                 returns an array of costs for each J separately.
     """
 
-    # Infinite cost if the parameters are out of bounds:
-    if self.check_param(param):
-        if return_sum:
-            return -np.inf
-
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
-
-    # Reset to initial conditions:
-    self.reset()
-
-    # Get densities according to self.density_function():
-    self.rhoi = self.density_function(
-        self.li, self.opts["M_phys"], param=param
-    )
-
-    # Update the internal parameters:
-    self.dens_param_calc = param
-
-    # Call relax_to_density():
-    try:
-        it = self.relax_to_density()
-
-    except ValueError:
-        if return_sum:
-            return -np.inf
-
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
-
-    # Infinite cost if the result is unphysical:
-    if _check_phys(self) or it == self.opts["max_iter_density"]:
-        if return_sum:
-            return -np.inf
-
-        else:
-            return [-np.inf] * len(self.opts["target_Js"])
-
-    # Calculate the cost, i.e. the deviation from the target values:
-    costJs = np.zeros_like(self.opts["target_Js"])
-
-    for i in range(len(costJs)):
-        costJs[i] = (
-            -((self.Js[i + 1] - self.opts["target_Js"][i]) ** 2)
-            / self.opts["sigma_Js"][i] ** 2
-        )
-
-    # Return the cost value:
-    if return_sum:
-        return np.sum(costJs)
-
-    else:
-        return costJs
+    return _cost(self, _DENSITY, param, return_sum)
 
 
 def baro_log_prob(param, tof):
@@ -232,48 +239,35 @@ def dens_log_prob(param, tof):
     return dens_cost_function(tof, param)
 
 
-def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
+def _initial_parameters(self, model, nwalkers):
     """
-    Uses the emcee algorithm for the given amount of steps and creates nwalkers
-    many parameter candidates (i.e. walkers) that will explore the allowed
-    parameter space (constrained by check_phys() and check_param()).
+    Draws random starting parameters (as fractions of the initial values)
+    until nwalkers of them are accepted by check_param() and yield a physical
+    solution.
     """
 
-    # Find a random set of starting parameters:
-    param_0 = np.zeros((nwalkers, len(self.opts["baro_param_init"])))
+    initial = self.opts[model.param_init]
+    param_0 = np.zeros((nwalkers, len(initial)))
 
     # Set up iterative procedure:
     i = 0
 
     while i < nwalkers:
         # Propose a new candidate:
-        param_0[i, :] = (
-            np.random.rand(1, len(self.opts["baro_param_init"]))
-            * self.opts["baro_param_init"]
-        )
+        param_0[i, :] = np.random.rand(1, len(initial)) * initial
 
         # Propose new candidates as long the previous one is out of bounds:
         while self.check_param(param_0[i, :]):
-            param_0[i, :] = (
-                np.random.rand(1, len(self.opts["baro_param_init"]))
-                * self.opts["baro_param_init"]
-            )
+            param_0[i, :] = np.random.rand(1, len(initial)) * initial
 
-        # Reset to initial conditions:
-        self.reset()
-
-        # Update the internal parameters:
-        self.baro_param_calc = param_0[i, :]
-
-        # Call relax_to_barotrope():
         try:
-            it = self.relax_to_barotrope()
+            it = _reset_and_relax(self, model, param_0[i, :])
 
         except ValueError:
             continue
 
         # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(self)) and it < self.opts["max_iter_barotrope"]:
+        if (not _check_phys(self)) and it < self.opts[model.max_iter]:
             say(
                 self.opts["verbosity"],
                 1,
@@ -283,12 +277,56 @@ def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
 
             i = i + 1
 
-    if self.opts["verbosity"] > 0:
-        progress = True
+    return param_0
+
+
+def _run_sampler(self, log_prob, param_0, steps, progress, pool=None):
+    """
+    Runs the emcee sampler and checks the autocorrelation time every 100
+    steps. Returns the final state, the autocorrelation times and their
+    number.
+    """
+
+    nwalkers, ndim = param_0.shape
+    sampler = emcee.EnsembleSampler(
+        nwalkers, ndim, log_prob, args=[self], pool=pool
+    )
+
+    index = 0
+    autocorr = np.empty(steps)
+    old_tau = np.inf
+
+    for _last_state in sampler.sample(
+        param_0, iterations=steps, progress=progress
+    ):
+        if sampler.iteration % 100:
+            continue
+
+        tau = sampler.get_autocorr_time(tol=0)
+        autocorr[index] = np.mean(tau)
+        index = index + 1
+
+        converged = np.all(tau * 100 < sampler.iteration) and np.all(
+            np.abs(old_tau - tau) / tau < 0.01
+        )
+        if converged:
+            break
+        old_tau = tau
+
+    return _last_state, autocorr, index
+
+
+def _run_mc(self, model, log_prob, cost, nwalkers, steps, Ncores, parallelize):
+    """Shared implementation of run_baro_MC and run_dens_MC."""
+
+    param_0 = _initial_parameters(self, model, nwalkers)
+
+    progress = self.opts["verbosity"] > 0
+    if progress:
         average = 0
 
         for i in range(nwalkers):
-            average += baro_cost_function(self, param_0[i, :]) / nwalkers
+            average += cost(self, param_0[i, :]) / nwalkers
 
         say(
             self.opts["verbosity"],
@@ -298,77 +336,18 @@ def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
             average=average,
         )
 
-    else:
-        progress = False
-
     # Do the MCMC algorithm in a parallel manner on multiple cores:
     if parallelize:
         with multiprocessing.Pool(processes=Ncores) as pool:
-            sampler = emcee.EnsembleSampler(
-                nwalkers,
-                len(self.opts["baro_param_init"]),
-                baro_log_prob,
-                args=[self],
-                pool=pool,
+            state, autocorr, index = _run_sampler(
+                self, log_prob, param_0, steps, progress, pool=pool
             )
-
-            # Run the Markov Chain Monte Carlo class from emcee:
-            index = 0
-            autocorr = np.empty(steps)
-            old_tau = np.inf
-
-            for _sample in sampler.sample(
-                param_0, iterations=steps, progress=progress
-            ):
-                if sampler.iteration % 100:
-                    continue
-
-                tau = sampler.get_autocorr_time(tol=0)
-                autocorr[index] = np.mean(tau)
-                index = index + 1
-
-                converged = np.all(tau * 100 < sampler.iteration) and np.all(
-                    np.abs(old_tau - tau) / tau < 0.01
-                )
-                if converged:
-                    break
-                old_tau = tau
-
-            state = _sample
 
     # Do the MCMC algorithm on a single core:
     else:
-        # Set up the Markov Chain Monte Carlo class from emcee:
-        sampler = emcee.EnsembleSampler(
-            nwalkers,
-            len(self.opts["baro_param_init"]),
-            baro_log_prob,
-            args=[self],
+        state, autocorr, index = _run_sampler(
+            self, log_prob, param_0, steps, progress
         )
-
-        # Run the Markov Chain Monte Carlo class from emcee:
-        index = 0
-        autocorr = np.empty(steps)
-        old_tau = np.inf
-
-        for _sample in sampler.sample(
-            param_0, iterations=steps, progress=progress
-        ):
-            if sampler.iteration % 100:
-                continue
-
-            tau = sampler.get_autocorr_time(tol=0)
-            autocorr[index] = np.mean(tau)
-            index = index + 1
-
-            converged = np.all(tau * 100 < sampler.iteration) and np.all(
-                np.abs(old_tau - tau) / tau < 0.01
-            )
-            if converged:
-                break
-            old_tau = tau
-
-        state = _sample
 
     say(
         self.opts["verbosity"],
@@ -379,6 +358,25 @@ def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
     )
 
     return state[0], autocorr[:index]
+
+
+def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
+    """
+    Uses the emcee algorithm for the given amount of steps and creates nwalkers
+    many parameter candidates (i.e. walkers) that will explore the allowed
+    parameter space (constrained by check_phys() and check_param()).
+    """
+
+    return _run_mc(
+        self,
+        _BAROTROPE,
+        baro_log_prob,
+        baro_cost_function,
+        nwalkers,
+        steps,
+        Ncores,
+        parallelize,
+    )
 
 
 def run_dens_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
@@ -388,151 +386,16 @@ def run_dens_MC(self, nwalkers, steps, Ncores=8, parallelize=False):
     parameter space (constrained by check_phys() and check_param()).
     """
 
-    # Find a random set of starting parameters:
-    param_0 = np.zeros((nwalkers, len(self.opts["dens_param_init"])))
-
-    # Set up iterative procedure:
-    i = 0
-
-    while i < nwalkers:
-        # Propose a new candidate:
-        param_0[i, :] = (
-            np.random.rand(1, len(self.opts["dens_param_init"]))
-            * self.opts["dens_param_init"]
-        )
-
-        # Propose new candidates as long the previous one is out of bounds:
-        while self.check_param(param_0[i, :]):
-            param_0[i, :] = (
-                np.random.rand(1, len(self.opts["dens_param_init"]))
-                * self.opts["dens_param_init"]
-            )
-
-        # Reset to initial conditions:
-        self.reset()
-
-        # Get densities according to self.density_function():
-        self.rhoi = self.density_function(
-            self.li, self.opts["M_phys"], param=param_0[i, :]
-        )
-
-        # Update the internal parameters:
-        self.dens_param_calc = param_0[i, :]
-
-        # Call relax_to_density():
-        try:
-            it = self.relax_to_density()
-
-        except ValueError:
-            continue
-
-        # Only proceed if the candidate also yields a physical solution:
-        if (not _check_phys(self)) and it < self.opts["max_iter_density"]:
-            say(
-                self.opts["verbosity"],
-                1,
-                "Generated initial conditions for walker number: {i}",
-                i=i,
-            )
-
-            i = i + 1
-
-    if self.opts["verbosity"] > 0:
-        progress = True
-        average = 0
-
-        for i in range(nwalkers):
-            average += dens_cost_function(self, param_0[i, :]) / nwalkers
-
-        say(
-            self.opts["verbosity"],
-            1,
-            "Average cost of a walker with the generated initial "
-            "parameters: {average:.2e}",
-            average=average,
-        )
-
-    else:
-        progress = False
-
-    # Do the MCMC algorithm in a parallel manner on multiple cores:
-    if parallelize:
-        with multiprocessing.Pool(processes=Ncores) as pool:
-            sampler = emcee.EnsembleSampler(
-                nwalkers,
-                len(self.opts["dens_param_init"]),
-                dens_log_prob,
-                args=[self],
-                pool=pool,
-            )
-
-            # Run the Markov Chain Monte Carlo class from emcee:
-            index = 0
-            autocorr = np.empty(steps)
-            old_tau = np.inf
-
-            for _sample in sampler.sample(
-                param_0, iterations=steps, progress=progress
-            ):
-                if sampler.iteration % 100:
-                    continue
-
-                tau = sampler.get_autocorr_time(tol=0)
-                autocorr[index] = np.mean(tau)
-                index = index + 1
-
-                converged = np.all(tau * 100 < sampler.iteration) and np.all(
-                    np.abs(old_tau - tau) / tau < 0.01
-                )
-                if converged:
-                    break
-                old_tau = tau
-
-            state = _sample
-
-    # Do the MCMC algorithm on a single core:
-    else:
-        # Set up the Markov Chain Monte Carlo class from emcee:
-        sampler = emcee.EnsembleSampler(
-            nwalkers,
-            len(self.opts["dens_param_init"]),
-            dens_log_prob,
-            args=[self],
-        )
-
-        # Run the Markov Chain Monte Carlo class from emcee:
-        index = 0
-        autocorr = np.empty(steps)
-        old_tau = np.inf
-
-        for _sample in sampler.sample(
-            param_0, iterations=steps, progress=progress
-        ):
-            if sampler.iteration % 100:
-                continue
-
-            tau = sampler.get_autocorr_time(tol=0)
-            autocorr[index] = np.mean(tau)
-            index = index + 1
-
-            converged = np.all(tau * 100 < sampler.iteration) and np.all(
-                np.abs(old_tau - tau) / tau < 0.01
-            )
-            if converged:
-                break
-            old_tau = tau
-
-        state = _sample
-
-    say(
-        self.opts["verbosity"],
-        1,
-        "Average cost of a walker after the Markov Chain Monte Carlo walk: "
-        "{average:.2e}",
-        average=np.sum(state[1]) / nwalkers,
+    return _run_mc(
+        self,
+        _DENSITY,
+        dens_log_prob,
+        dens_cost_function,
+        nwalkers,
+        steps,
+        Ncores,
+        parallelize,
     )
-
-    return state[0], autocorr[:index]
 
 
 def classify_and_save_state(

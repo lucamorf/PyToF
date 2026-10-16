@@ -190,3 +190,60 @@ def summarize(X):
         "rhoi_sample": X.rhoi[idx].tolist(),
         "Pi_sample": X.Pi[idx].tolist(),
     }
+
+
+def _is_not_positive(param):
+    return bool(np.any(np.asarray(param) <= 0))
+
+
+def mcmc_summary():
+    """
+    Seeded serial MCMC runs of both models. The barotrope run is long enough
+    (100 steps) to reach the autocorrelation check, the density run is short.
+    """
+
+    targets = dict(
+        target_Js=np.array([1.3988e-2, -5.318e-4]),
+        sigma_Js=np.array([1e-4, 1e-5]),
+    )
+    summary = {}
+
+    X = ClassToF.ToF(
+        N=16,
+        order=4,
+        R_ref=R_JUPITER,
+        baro_param_init=[1.0],
+        **targets,
+    )
+    X.set_barotrope(_barotrope_K)
+    X.set_check_param(_is_not_positive)
+    np.random.seed(3)
+    state, autocorr = X.run_baro_MC(4, 100, parallelize=False)
+    summary["baro_state"] = state.tolist()
+    summary["baro_autocorr"] = autocorr.tolist()
+    summary["baro_costs"] = [
+        float(X.baro_cost_function(np.array([k]))) for k in (0.5, 1.0, 2.0)
+    ]
+    summary["baro_costs_separate"] = list(
+        X.baro_cost_function(np.array([1.0]), return_sum=False)
+    )
+
+    Y = ClassToF.ToF(
+        N=16,
+        order=4,
+        R_ref=R_JUPITER,
+        dens_param_init=[1.0] * 2,
+        **targets,
+    )
+    Y.set_density_function(_dens_piecewise)
+    Y.set_check_param(lambda param: bool(np.any(np.asarray(param) < 0)))
+    np.random.seed(5)
+    state, autocorr = Y.run_dens_MC(4, 20, parallelize=False)
+    summary["dens_state"] = state.tolist()
+    summary["dens_autocorr"] = autocorr.tolist()
+    summary["dens_costs"] = [
+        float(Y.dens_cost_function(np.array(p)))
+        for p in ([1, 1], [0.5, 2], [3, 0.1])
+    ]
+
+    return summary
