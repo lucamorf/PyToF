@@ -615,20 +615,21 @@ def plot_ss(self, **kwargs):
     self.fig, self.ax = plt.subplots(layout="constrained")
 
     # Get data for plotting:
-    ss = self.ss
+    figure_functions = self.figure_functions
 
     handles = []
     labels = []
-    for i in range(len(ss)):
+    for i in range(len(figure_functions)):
         if i != 0:
             x = np.append(self.li / self.li[0], 0)
+            f = figure_functions[i]
             y = np.append(
-                np.flip(ss[i] / np.max(abs(ss[i]))),
-                ss[i][0] / np.max(abs(ss[i])),
+                np.flip(f / np.max(abs(f))),
+                f[0] / np.max(abs(f)),
             )
 
             # Do the plotting:
-            val, exp = f"{np.max(abs(ss[i])):.1e}".split("e")
+            val, exp = f"{np.max(abs(figure_functions[i])):.1e}".split("e")
             self.ax.plot(
                 x,
                 y,

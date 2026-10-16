@@ -234,14 +234,38 @@ def test_reset_restores_a_fresh_object():
         assert getattr(X, name) == getattr(fresh, name)
 
 
-def test_old_attribute_names_still_work_but_warn():
+def test_old_method_name_still_works_but_warns():
     X = ClassToF.ToF(N=32)
     with pytest.warns(RenamedWarning, match="reset"):
         X._set_IC()
-    with pytest.warns(RenamedWarning, match="Js_errors") as record:
-        errors = X.Js_error
-    assert record[0].filename == __file__
-    assert errors is X.Js_errors
+
+
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        ("Js_error", "Js_errors"),
+        ("ss", "figure_functions"),
+        ("SS", "volume_integrals"),
+    ],
+)
+def test_old_attribute_names_still_work_but_warn(old, new):
+    X = jupiter_polytrope(4, 32)
+
+    with pytest.warns(RenamedWarning, match=new) as record:
+        value = getattr(X, old)
+    assert record[0].filename == __file__  # points at the user's line
+    assert value is getattr(X, new)
+
+    replacement = [np.zeros(3)]
     with pytest.warns(RenamedWarning):
-        X.Js_error = np.zeros(5)
-    assert np.all(X.Js_errors == 0)
+        setattr(X, old, replacement)
+    assert getattr(X, new) is replacement
+
+
+def test_figure_functions_and_volume_integrals_are_filled_by_relaxing():
+    X = jupiter_polytrope(7, 64)
+    assert len(X.figure_functions) == 8  # s_n for n = 0, 2, ..., 2 * order
+    assert len(X.volume_integrals) == 16  # S_n followed by the primed S'_n
+    for quantity in (X.figure_functions, X.volume_integrals):
+        assert all(len(entry) == 64 for entry in quantity)
+    assert np.any(X.figure_functions[1] != 0)

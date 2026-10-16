@@ -358,10 +358,10 @@ def get_r_l_mu(self, mu):
     # Calculate array with r_l(mu):
     r_l_mu = 1
 
-    for i in range(len(self.ss)):
+    for i in range(len(self.figure_functions)):
         # Flip since AlgoToF uses a different ordering logic:
         r_l_mu = r_l_mu + np.outer(
-            np.flip(self.ss[i]),
+            np.flip(self.figure_functions[i]),
             np.polynomial.legendre.Legendre.basis(2 * i)(mu),
         )
 
@@ -648,7 +648,7 @@ def _relax_to_shape(tof, maxiter="default"):
         verbosity=tof.opts["verbosity"],
         debug_plot=tof.opts["debug_plot"],
         R_ref=tof.opts["R_ref"],
-        ss_initial=tof.ss,
+        ss_initial=tof.figure_functions,
         alphas=alphas,
         H=tof.opts["H"],
         use_simpson=tof.simpson_in_use,
@@ -667,10 +667,10 @@ def _relax_to_shape(tof, maxiter="default"):
     # Save results:
     tof.A0 = out.A0  # inside->outside instead of outside->inside since
     # AlgoToF uses a different ordering logic!
-    tof.ss = out.ss  # inside->outside instead of outside->inside since
-    # AlgoToF uses a different ordering logic!
-    tof.SS = out.SS  # inside->outside instead of outside->inside since
-    # AlgoToF uses a different ordering logic!
+    # inside->outside instead of outside->inside since AlgoToF uses a
+    # different ordering logic:
+    tof.figure_functions = out.ss
+    tof.volume_integrals = out.SS
     tof.R_eq_to_R_m = out.R_eq_to_R_m
     tof.R_po_to_R_m = out.R_po_to_R_m
     if tof.simpson_in_use and not out.use_simpson:

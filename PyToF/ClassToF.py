@@ -37,6 +37,30 @@ from PyToF.PlotToF import (
 )
 
 
+def _renamed_attribute(old, new):
+    """A property making the attribute ``old`` an alias of ``new`` (warns)."""
+
+    def message():
+        warn(
+            "ToF.{old} was renamed to ToF.{new}. The old name still works but "
+            "will be removed in a future version.",
+            RenamedWarning,
+            stacklevel=3,
+            old=old,
+            new=new,
+        )
+
+    def getter(self):
+        message()
+        return getattr(self, new)
+
+    def setter(self, value):
+        message()
+        setattr(self, new, value)
+
+    return property(getter, setter, doc=f"Old name of {new}.")
+
+
 class ToF:
     """
     This class contains standard routines when using the Theory of Figures.
@@ -95,10 +119,11 @@ class ToF:
                             rotation is used
         - R_calc            Float, calculated equatorial radius in SI units
         - m_rot_calc:       Float, dimensionless rotational parameter
-        - ss:               List of arrays, figure functions introduced in
+        - figure_functions: List of arrays, figure functions s_n introduced in
                             Eq. (B.1) in arXiv:1708.06177v1
-        - SS:               List of arrays, dimensionless volume integrals
-                            introduced in Eq. (B.7) in arXiv:1708.06177v1
+        - volume_integrals: List of arrays, dimensionless volume integrals S_n
+                            introduced in Eq. (B.7) in arXiv:1708.06177v1,
+                            followed by the primed integrals S'_n
         - A0:               Array, important to determine the total potential
                             introduced in Eq. (B.3) in arXiv:1708.06177v1
         - R_eq_to_R_m:      Float, ratio of the equatorial radius to the to
@@ -137,8 +162,12 @@ class ToF:
             * self.li[0] ** 3
             / (self.opts["G"] * self.opts["M_phys"])
         )
-        self.ss = (self.opts["order"] + 1) * [np.zeros(self.opts["N"])]
-        self.SS = (self.opts["order"] + 1) * [np.zeros(self.opts["N"])]
+        self.figure_functions = (self.opts["order"] + 1) * [
+            np.zeros(self.opts["N"])
+        ]
+        self.volume_integrals = (self.opts["order"] + 1) * [
+            np.zeros(self.opts["N"])
+        ]
         self.A0 = np.zeros(self.opts["N"])
         self.U = np.zeros(self.opts["N"])
         self.R_eq_to_R_m = 1.0
@@ -195,22 +224,6 @@ class ToF:
         )
         self.reset()
 
-    @property
-    def Js_error(self):
-        """Old name of Js_errors."""
-
-        warn(
-            "ToF.Js_error was renamed to ToF.Js_errors. The old name still "
-            "works but will be removed in a future version.",
-            RenamedWarning,
-        )
-        return self.Js_errors
-
-    @Js_error.setter
-    def Js_error(self, value):
-        warn(
-            "ToF.Js_error was renamed to ToF.Js_errors. The old name still "
-            "works but will be removed in a future version.",
-            RenamedWarning,
-        )
-        self.Js_errors = value
+    Js_error = _renamed_attribute("Js_error", "Js_errors")
+    ss = _renamed_attribute("ss", "figure_functions")
+    SS = _renamed_attribute("SS", "volume_integrals")
