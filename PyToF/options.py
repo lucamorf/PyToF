@@ -288,6 +288,25 @@ class Options:
             )
 
     @staticmethod
+    def _validate_max_iteration_count(name, value):
+        # The relaxation loops count from 1 and run while the counter is below
+        # the limit, so a limit of 1 would never run them at all.
+        if not isinstance(value, (int, np.integer)) or value < 2:
+            raise ValueError(f"{name} must be an integer >= 2, not {value!r}.")
+
+    @classmethod
+    def _validate_max_iter_update(cls, value):
+        cls._validate_max_iteration_count("max_iter_update", value)
+
+    @classmethod
+    def _validate_max_iter_barotrope(cls, value):
+        cls._validate_max_iteration_count("max_iter_barotrope", value)
+
+    @classmethod
+    def _validate_max_iter_density(cls, value):
+        cls._validate_max_iteration_count("max_iter_density", value)
+
+    @staticmethod
     def _validate_verbosity(value):
         if not isinstance(value, (int, np.integer)) or value < 0:
             raise ValueError(

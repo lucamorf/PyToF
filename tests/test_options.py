@@ -83,6 +83,9 @@ def test_unknown_name_cannot_be_read_or_written():
         ({"R_phys": 7e7}, TypeError),
         ({"R_phys": [7e7]}, TypeError),
         ({"verbosity": -1}, ValueError),
+        ({"max_iter_barotrope": 1}, ValueError),
+        ({"max_iter_density": 0}, ValueError),
+        ({"max_iter_update": 1}, ValueError),
         ({"verbosity": "loud"}, ValueError),
     ],
 )
