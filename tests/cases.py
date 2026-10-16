@@ -45,13 +45,19 @@ def jupiter_polytrope(order=4, N=256, **kwargs):
     return X
 
 
-def uniform_sphere(N=1024, period=np.inf, radius=1e6, rho=1000.0, order=4):
-    """Relaxed constant-density body (sphere for period=inf)."""
+def uniform_sphere(
+    N=1024, period=np.inf, radius=1e6, rho=1000.0, order=4, **kwargs
+):
+    """
+    Relaxed constant-density body (sphere for period=inf). Further keyword
+    arguments are passed on to ToF and override the defaults set here.
+    """
     radii = radius * np.linspace(1, 1e-3, N)
     mass = -4 * np.pi * trapezoid(rho * np.ones(N) * radii**2, x=radii)
-    X = ClassToF.ToF(
+    options = dict(
         N=N, M_phys=mass, R_phys=[radius, "mean"], Period=period, order=order
     )
+    X = ClassToF.ToF(**{**options, **kwargs})
     X.li = radii
     X.rhoi = rho * np.ones(N)
     X.m_rot_calc = (

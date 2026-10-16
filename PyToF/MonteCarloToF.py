@@ -9,7 +9,7 @@ import os
 import emcee
 import numpy as np
 
-from PyToF.color import c
+from PyToF.messages import paint, say
 
 multiprocessing.set_start_method("fork", force=True)
 
@@ -23,8 +23,12 @@ def _check_phys(class_obj):
 
     # Density inversions are considered to be unphysical:
     if np.any(np.diff(class_obj.rhoi) < 0):
-        if class_obj.opts["verbosity"] > 1:
-            print(c.WARN + "Physicality warning: density inversion!" + c.ENDC)
+        say(
+            class_obj.opts["verbosity"],
+            2,
+            "Physicality warning: density inversion!",
+            kind="warn",
+        )
 
         return True
 
@@ -34,19 +38,23 @@ def _check_phys(class_obj):
         or np.isnan(class_obj.Pi).any()
         or np.isnan(class_obj.Js).any()
     ):
-        if class_obj.opts["verbosity"] > 1:
-            print(c.WARN + "Physicality warning: NaN values!" + c.ENDC)
+        say(
+            class_obj.opts["verbosity"],
+            2,
+            "Physicality warning: NaN values!",
+            kind="warn",
+        )
 
         return True
 
     # There should be no negative density or pressure values:
     elif (np.min(class_obj.rhoi) < 0) or (np.min(class_obj.Pi) < 0):
-        if class_obj.opts["verbosity"] > 1:
-            print(
-                c.WARN
-                + "Physicality warning: negative density or pressure values!"
-                + c.ENDC
-            )
+        say(
+            class_obj.opts["verbosity"],
+            2,
+            "Physicality warning: negative density or pressure values!",
+            kind="warn",
+        )
 
         return True
 
@@ -54,13 +62,13 @@ def _check_phys(class_obj):
     elif (np.max(class_obj.rhoi) > class_obj.opts["rho_MAX"]) or (
         np.max(class_obj.Pi) > class_obj.opts["P_MAX"]
     ):
-        if class_obj.opts["verbosity"] > 1:
-            print(
-                c.WARN
-                + "Physicality warning: density or pressure values above the "
-                + "given maxima!"
-                + c.ENDC
-            )
+        say(
+            class_obj.opts["verbosity"],
+            2,
+            "Physicality warning: density or pressure values above the "
+            "given maxima!",
+            kind="warn",
+        )
 
         return True
 
@@ -266,14 +274,12 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
         # Only proceed if the candidate also yields a physical solution:
         if (not _check_phys(class_obj)) and it < class_obj.opts["MaxIterBar"]:
-            if class_obj.opts["verbosity"] > 0:
-                print(
-                    c.INFO
-                    + "Generated initial conditions for walker number: "
-                    + c.NUMB
-                    + str(i)
-                    + c.ENDC
-                )
+            say(
+                class_obj.opts["verbosity"],
+                1,
+                "Generated initial conditions for walker number: {i}",
+                i=i,
+            )
 
             i = i + 1
 
@@ -284,12 +290,12 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         for i in range(nwalkers):
             average += baro_cost_function(class_obj, param_0[i, :]) / nwalkers
 
-        print(
-            c.INFO
-            + "Average cost of a walker with the generated initial parameters:"
-            + c.NUMB
-            + f" {average:.2e}"
-            + c.ENDC
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "Average cost of a walker with the generated initial "
+            "parameters: {average:.2e}",
+            average=average,
         )
 
     else:
@@ -364,15 +370,13 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
         state = _sample
 
-    if class_obj.opts["verbosity"] > 0:
-        print(
-            c.INFO
-            + "Average cost of a walker after the Markov Chain Monte Carlo"
-            + " walk: "
-            + c.NUMB
-            + f"{np.sum(state[1]) / nwalkers:.2e}"
-            + c.ENDC
-        )
+    say(
+        class_obj.opts["verbosity"],
+        1,
+        "Average cost of a walker after the Markov Chain Monte Carlo walk: "
+        "{average:.2e}",
+        average=np.sum(state[1]) / nwalkers,
+    )
 
     return state[0], autocorr[:index]
 
@@ -424,14 +428,12 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
         # Only proceed if the candidate also yields a physical solution:
         if (not _check_phys(class_obj)) and it < class_obj.opts["MaxIterDen"]:
-            if class_obj.opts["verbosity"] > 0:
-                print(
-                    c.INFO
-                    + "Generated initial conditions for walker number: "
-                    + c.NUMB
-                    + str(i)
-                    + c.ENDC
-                )
+            say(
+                class_obj.opts["verbosity"],
+                1,
+                "Generated initial conditions for walker number: {i}",
+                i=i,
+            )
 
             i = i + 1
 
@@ -442,12 +444,12 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
         for i in range(nwalkers):
             average += dens_cost_function(class_obj, param_0[i, :]) / nwalkers
 
-        print(
-            c.INFO
-            + "Average cost of a walker with the generated initial parameters:"
-            + c.NUMB
-            + f" {average:.2e}"
-            + c.ENDC
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "Average cost of a walker with the generated initial "
+            "parameters: {average:.2e}",
+            average=average,
         )
 
     else:
@@ -522,15 +524,13 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
 
         state = _sample
 
-    if class_obj.opts["verbosity"] > 0:
-        print(
-            c.INFO
-            + "Average cost of a walker after the Markov Chain Monte Carlo"
-            + " walk: "
-            + c.NUMB
-            + f"{np.sum(state[1]) / nwalkers:.2e}"
-            + c.ENDC
-        )
+    say(
+        class_obj.opts["verbosity"],
+        1,
+        "Average cost of a walker after the Markov Chain Monte Carlo walk: "
+        "{average:.2e}",
+        average=np.sum(state[1]) / nwalkers,
+    )
 
     return state[0], autocorr[:index]
 
@@ -573,18 +573,16 @@ def classify_and_save_state(
 
         else:
             raise KeyError(
-                c.WARN
-                + "Invalid keyword for what_model! Use 'baro' or 'dens'."
-                + c.ENDC
+                "Invalid keyword for what_model! Use 'baro' or 'dens'."
             )
 
         # Check if there is agreement with physical data within 1 sigma:
         if (np.abs(costJs) < 1e0).all():
-            output_color = c.GOOD
+            kind = "good"
             matches_observed_Js.append(True)
 
         else:
-            output_color = c.WARN
+            kind = "warn"
             matches_observed_Js.append(False)
 
         # Save .txt file if wanted by the user:
@@ -643,41 +641,35 @@ def classify_and_save_state(
 
         elif not what_save == "good":
             raise KeyError(
-                c.WARN
-                + "Invalid keyword for what_save! Use 'all' or 'good' or "
-                + "'none'."
-                + c.ENDC
+                "Invalid keyword for what_save! Use 'all' or 'good' or 'none'."
             )
 
         # Update storage arrays:
         rho_maxs.append(np.max(class_obj.rhoi))
 
-        # Verbositiy output:
-        if class_obj.opts["verbosity"] > 0:
-            print()
-            total_cost = np.sum(costJs)
-            print(
-                f"{output_color}"
-                f"Walker #{c.NUMB}{i}{output_color} "
-                f"yields a total cost of "
-                f"{c.NUMB}{total_cost:.2e}"
-                f"{output_color}.{c.ENDC}"
-            )
-
-            string1 = "         "
-            string2 = ""
-            string3 = ""
+        # Verbosity output:
+        verbosity = class_obj.opts["verbosity"]
+        if verbosity > 0:
+            header = " " * 9
+            mine = ""
+            target = ""
 
             for j, cost_j in enumerate(costJs):
-                string1 += (
-                    f"{c.get(abs(cost_j) < 1e0)}     J{2 * (j + 1)}     "
-                )
-                string2 += f"{class_obj.Js[j + 1]:.5e} "
-                string3 += f"{class_obj.opts['Target_Js'][j]:.5e} "
+                label = f"     J{2 * (j + 1)}     "
+                header += paint(label, "good" if abs(cost_j) < 1e0 else "warn")
+                mine += f"{class_obj.Js[j + 1]:.5e} "
+                target += f"{class_obj.opts['Target_Js'][j]:.5e} "
 
-            print(f"{c.INFO}{string1}{c.ENDC}")
-            print(f"{c.INFO}My code: {c.NUMB}{string2}{c.ENDC}")
-            print(f"{c.INFO}Target:  {c.NUMB}{string3}{c.ENDC}")
-            print()
+            say(
+                verbosity,
+                1,
+                "\nWalker #{i} yields a total cost of {total_cost:.2e}.",
+                kind=kind,
+                i=i,
+                total_cost=np.sum(costJs),
+            )
+            print(header)
+            say(verbosity, 1, "My code: {values}", values=mine)
+            say(verbosity, 1, "Target:  {values}\n", values=target)
 
     return np.array(matches_observed_Js), np.array(rho_maxs)

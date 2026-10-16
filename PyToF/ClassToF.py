@@ -5,7 +5,6 @@
 import numpy as np
 import scipy
 
-from PyToF.color import c
 from PyToF.FunctionsToF import (
     get_Js_errors,
     get_Kn,
@@ -18,6 +17,7 @@ from PyToF.FunctionsToF import (
     set_barotrope,
     set_density_function,
 )
+from PyToF.messages import say, warn
 from PyToF.MonteCarloToF import (
     baro_cost_function,
     classify_and_save_state,
@@ -182,7 +182,7 @@ class ToF:
                 opts[kw] = v
 
             else:
-                print(str(kw) + c.WARN + " is an invalid keyword!" + c.ENDC)
+                warn("{kw} is an invalid keyword!", kw=kw)
 
         return opts
 
@@ -262,29 +262,25 @@ class ToF:
         # Set initial values:
         self.opts = self._default_opts(kwargs)
         assert len(self.opts["R_phys"]) == 2, (
-            c.WARN
-            + "R_phys must be a list-like object with length 2! First entry: "
-            + "float: radius in SI units, Second entry: string: 'equatorial', "
-            + "'mean', 'polar'"
-            + c.ENDC
+            "R_phys must be a list-like object with length 2! First entry: "
+            "float: radius in SI units, Second entry: string: 'equatorial', "
+            "'mean', 'polar'"
         )
         assert self.opts["R_phys"][1] in ["equatorial", "mean", "polar"], (
-            c.WARN
-            + "The second entry of R_phys must be a string, options: "
-            + "'equatorial', 'mean', 'polar'"
-            + c.ENDC
+            "The second entry of R_phys must be a string, options: "
+            "'equatorial', 'mean', 'polar'"
         )
 
         if self.opts["R_ref"] is None:
             self.opts["R_ref"] = self.opts["R_phys"][0]
 
-            if self.opts["verbosity"] > 0:
-                print(
-                    c.WARN
-                    + "No reference radius supplied by the user. PyToF "
-                    + "assumes R_ref = R_phys."
-                    + c.ENDC
-                )
+            say(
+                self.opts["verbosity"],
+                1,
+                "No reference radius supplied by the user. PyToF assumes "
+                "R_ref = R_phys.",
+                kind="warn",
+            )
 
         # Set initial conditions:
         self._set_IC()

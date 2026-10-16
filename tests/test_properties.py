@@ -5,6 +5,7 @@ import pytest
 
 from PyToF import ClassToF
 from PyToF.FunctionsToF import _mass_int
+from PyToF.messages import PyToFWarning
 from tests.cases import WH16_BESSEL, jupiter_polytrope
 
 
@@ -87,11 +88,11 @@ def test_invalid_radius_specification_is_rejected():
         ClassToF.ToF(R_phys=7e7)
 
 
-def test_unknown_option_is_reported(capsys):
-    # CURRENT behaviour: only a printed warning (planned to become a
-    # TypeError in step 03, at which point this test is updated).
-    ClassToF.ToF(Verbosity=2)
-    assert "invalid keyword" in capsys.readouterr().out
+def test_unknown_option_is_reported():
+    # CURRENT behaviour: only a warning (planned to become a TypeError in
+    # step 03c, at which point this test is updated).
+    with pytest.warns(PyToFWarning, match="invalid keyword"):
+        ClassToF.ToF(Verbosity=2)
 
 
 def test_public_api_surface():

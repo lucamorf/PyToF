@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 
-from PyToF.color import c
 
 
 def _default_mpl_opts():

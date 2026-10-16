@@ -9,7 +9,7 @@ import numpy as np
 import scipy
 
 import PyToF.AlgoToF as AlgoToF
-from PyToF.color import c
+from PyToF.messages import ConvergenceWarning, PyToFWarning, say, warn
 from PyToF.PlotDebugToF import debug_FunctionsToF_plot
 
 
@@ -57,17 +57,13 @@ def _fixradius(class_obj):
 
     else:
         raise KeyError(
-            c.WARN
-            + "Invalid R_phys type specification! Valid options: 'equatorial',"
-            + " 'mean', 'polar'"
-            + c.ENDC
+            "Invalid R_phys type specification! Valid options: 'equatorial', "
+            "'mean', 'polar'"
         )
 
     assert np.isclose(class_obj.R_calc, class_obj.opts["R_phys"][0]), (
-        c.WARN
-        + "Renormalizing the level surfaces for consistency with the initially"
-        + " provided physical radius failed!"
-        + c.ENDC
+        "Renormalizing the level surfaces for consistency with the initially "
+        "provided physical radius failed!"
     )
 
 
@@ -85,10 +81,8 @@ def _fixmass(class_obj):
 
     # Sanity check:
     assert np.isclose(_mass_int(class_obj), class_obj.opts["M_phys"]), (
-        c.WARN
-        + "Renormalizing the densities for consistency with the initially"
-        + " provided mass failed!"
-        + c.ENDC
+        "Renormalizing the densities for consistency with the initially "
+        "provided mass failed!"
     )
 
 
@@ -165,25 +159,22 @@ def _pressurize(class_obj):
         not (class_obj.Pi >= 0).all() or not (np.diff(class_obj.Pi) >= 0).all()
     ):
         class_obj.opts["use_simpson"] = False
-        if class_obj.opts["verbosity"] > 0:
-            print(
-                c.WARN
-                + "Calculated pressure contains negative or non-monotonic "
-                + "entries! Reverting to the more stable and less accurate "
-                + "trapezoid rule for integration to hopefully mitigate the "
-                + "issue."
-                + c.ENDC
-            )
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "Calculated pressure contains negative or non-monotonic entries! "
+            "Reverting to the more stable and less accurate trapezoid rule "
+            "for integration to hopefully mitigate the issue.",
+            kind="warn",
+        )
         _pressurize(class_obj)
 
     assert (class_obj.Pi >= 0).all(), (
-        c.WARN + "Calculated pressure contains negative entries! " + c.ENDC
+        "Calculated pressure contains negative entries!"
     )
 
     assert (np.diff(class_obj.Pi) >= 0).all(), (
-        c.WARN
-        + "Calculated pressure is not monotonically increasing! "
-        + c.ENDC
+        "Calculated pressure is not monotonically increasing!"
     )
 
 
@@ -211,9 +202,7 @@ def _update_densities_barotrope(class_obj):
 
     # Check for unphysical density inversions:
     if np.any(np.diff(class_obj.rhoi) < 0):
-        raise ValueError(
-            c.WARN + "Barotrope created density inversion!" + c.ENDC
-        )
+        raise ValueError("Barotrope created density inversion!")
 
     # Optional, use a provided atmospheric model:
     if class_obj.opts["use_atmosphere"]:
@@ -250,64 +239,49 @@ def _apply_atmosphere(class_obj):
 
     # Check for unphysical density inversions:
     if np.any(np.diff(class_obj.rhoi) < 0):
-        raise ValueError(
-            c.WARN + "Atmosphere created density inversion!" + c.ENDC
-        )
+        raise ValueError("Atmosphere created density inversion!")
 
 
-def _print_convergence_warning_drho(class_obj, drho):
+def _warn_not_converged_drho(class_obj, drho):
     """
-    This function prints a convergence warning message if rho did not converge
-    within the allowed number of iterations.
+    Warns that the densities did not converge within MaxIterUpdate iterations.
     """
 
-    string = (
-        f"{c.WARN}CONVERGENCE WARNING: drho = "
-        f"{c.NUMB}{drho:.0e} "
-        f"{c.WARN}> "
-        f"{c.NUMB}{class_obj.opts['drho_tol']:.0e} "
-        f"{c.WARN}= drho_tol "
-        f"{c.INFO}after MaxIterUpdate = "
-        f"{c.NUMB}{class_obj.opts['MaxIterUpdate']} "
-        f"{c.INFO}iterations.{c.ENDC}"
+    warn(
+        "drho = {drho:.0e} > {tol:.0e} = drho_tol after MaxIterUpdate = "
+        "{max_iter} iterations.",
+        ConvergenceWarning,
+        stacklevel=3,
+        drho=drho,
+        tol=class_obj.opts["drho_tol"],
+        max_iter=class_obj.opts["MaxIterUpdate"],
     )
 
-    print("\n" + string)
 
-
-def _print_convergence_warning(class_obj, drot, dJs, drho):
+def _warn_not_converged(class_obj, drot, dJs, drho, max_iter_name):
     """
-    Print a convergence warning message if m, the Js, or rho did not converge
-    within the allowed number of iterations.
+    Warns that the rotational parameter, the Js or the densities did not
+    converge within the number of iterations given by opts[max_iter_name].
     """
 
-    # Determine boolean convergence for each quantity
-    b1, b2, b3 = (
-        drot < class_obj.opts["drot_tol"],
-        dJs < class_obj.opts["dJ_tol"],
-        drho < class_obj.opts["drho_tol"],
+    quantities = [
+        ("drot", drot, class_obj.opts["drot_tol"]),
+        ("dJ", dJs, class_obj.opts["dJ_tol"]),
+        ("drho", drho, class_obj.opts["drho_tol"]),
+    ]
+    parts = [
+        f"{name} = {value:.0e} {'<' if value < tol else '>'} {tol:.0e}"
+        for name, value, tol in quantities
+    ]
+
+    warn(
+        "{details} after {name} = {max_iter} iterations.",
+        ConvergenceWarning,
+        stacklevel=3,
+        details=", ".join(parts),
+        name=max_iter_name,
+        max_iter=class_obj.opts[max_iter_name],
     )
-
-    # Get color codes for each convergence status
-    c1, c2, c3 = c.get(b1), c.get(b2), c.get(b3)
-
-    # Helper to format colored values and comparison symbols
-    def colored_val(start, val, tol, flag, color):
-        symbol = "<" if flag else ">"
-        return (
-            f"{color}{start}{val:.0e}{color} {symbol} {c.NUMB}{tol:.0e}{color}"
-        )
-
-    string = (
-        f"{c.WARN}CONVERGENCE WARNING: "
-        f"{colored_val('drot = ', drot, class_obj.opts['drot_tol'], b1, c1)}, "
-        f"{colored_val('dJ = ', dJs, class_obj.opts['dJ_tol'], b2, c2)}, "
-        f"{colored_val('drho = ', drho, class_obj.opts['drho_tol'], b3, c3)} "
-        f"{c.INFO}after MaxIterBar = {c.NUMB}{class_obj.opts['MaxIterBar']} "
-        f"{c.INFO}iterations.{c.ENDC}"
-    )
-
-    print("\n" + string)
 
 
 def get_Js_errors(class_obj):
@@ -318,61 +292,38 @@ def get_Js_errors(class_obj):
     """
 
     if max(abs(class_obj.opts["alphas"])) != 0:
-        print(
-            c.WARN
-            + "Accuracy when using differential rotation is unknown. "
-            + "PyToF provides no error estimates."
-            + c.ENDC
+        warn(
+            "Accuracy when using differential rotation is unknown. "
+            "PyToF provides no error estimates."
         )
         return 0
 
     if not np.allclose(np.diff(class_obj.li), np.diff(class_obj.li)[0]):
-        print(
-            c.WARN
-            + "Mean levels surfaces are not equidistant! "
-            + "Accuracy will be greatly reduced and PyToF "
-            + "provides no error estimates."
-            + c.ENDC
+        warn(
+            "Mean levels surfaces are not equidistant! Accuracy will be "
+            "greatly reduced and PyToF provides no error estimates."
         )
         return 0
 
     if class_obj.opts["use_simpson"]:
-        if class_obj.opts["verbosity"] > 0:
-            print(
-                c.INFO
-                + "The option"
-                + c.ENDC
-                + " use_simpson"
-                + c.INFO
-                + " is"
-                + c.NUMB
-                + " True"
-                + c.INFO
-                + ". This ensures the highest possible accuracy."
-                + c.ENDC
-            )
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "The option use_simpson is {flag}. This ensures the highest "
+            "possible accuracy.",
+            flag=True,
+        )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
     else:
-        if class_obj.opts["verbosity"] > 0:
-            print(
-                c.INFO
-                + "The option"
-                + c.ENDC
-                + " use_simpson"
-                + c.INFO
-                + " is"
-                + c.NUMB
-                + " False"
-                + c.INFO
-                + ". This yields a reduced accuracy. PyToF may have set this"
-                + " flag to"
-                + c.NUMB
-                + " False"
-                + c.INFO
-                + " without user input to mitigate stability issues."
-                + c.ENDC
-            )
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "The option use_simpson is {flag}. This yields a reduced "
+            "accuracy. PyToF may have set this flag to {flag} without user "
+            "input to mitigate stability issues.",
+            flag=False,
+        )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
 
@@ -413,11 +364,9 @@ def get_Js_errors(class_obj):
             )
 
             if np.isnan(class_obj.Js_error[i]):
-                print(
-                    c.WARN
-                    + "Tuple (N, n_bin) outside range that has been tested "
-                    + "for accuracy. PyToF provides no error estimates."
-                    + c.ENDC
+                warn(
+                    "Tuple (N, n_bin) outside range that has been tested for "
+                    "accuracy. PyToF provides no error estimates."
                 )
 
 
@@ -488,15 +437,13 @@ def get_NMoI(class_obj, N=1000):
         * dr_dl
     )  # dmu dl
 
-    if (
-        not np.allclose(np.diff(class_obj.li), np.diff(class_obj.li)[0])
-        and class_obj.opts["verbosity"] > 0
-    ):
-        print(
-            c.WARN
-            + "Mean levels surfaces are not equidistant! "
-            + "NMoI integration will be inaccurate."
-            + c.ENDC
+    if not np.allclose(np.diff(class_obj.li), np.diff(class_obj.li)[0]):
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "Mean levels surfaces are not equidistant! NMoI integration "
+            "will be inaccurate.",
+            kind="warn",
         )
 
     integrand_l = scipy.integrate.simpson(integrand_l_theta, x=mu, axis=1)
@@ -578,12 +525,13 @@ def get_Kn(class_obj, n, bs=None):
             class_obj.rhoi[index] - class_obj.rhoi[index - 1],
             class_obj.rhoi[index + 1] - class_obj.rhoi[index],
         )
-        print(
-            f"{c.INFO}Boundary condition applied at a radius of r/R="
-            f"{c.NUMB}{bs[i] / R:.2f}"
-            f"{c.INFO} with a density jump of "
-            f"{c.NUMB}{delta_rho:.2e}"
-            f"{c.INFO}kg/m^3.{c.ENDC}"
+        say(
+            class_obj.opts["verbosity"],
+            1,
+            "Boundary condition applied at a radius of r/R={radius:.2f} "
+            "with a density jump of {jump:.2e} kg/m^3.",
+            radius=bs[i] / R,
+            jump=delta_rho,
         )
 
         # Initial condition:
@@ -650,16 +598,43 @@ def set_density_function(class_obj, fun):
     class_obj.density_function = fun
 
 
-def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
+def _check_radius_consistency(class_obj):
     """
-    Calls Algorithm from AlgoToF until either the accuray given by
-    class_obj.opts['dJ_tol'] is fulfilled or maxiter is reached.
+    Warns if the radius provided via opts['R_phys'] differs from the radius of
+    the shape calculated by relax_to_shape().
+    """
 
-    check_consistency:  If True, checks whether the user provided radius is
-                        consistent with the shape of the planet calculated by
-                        PyToF
-    maxiter:            Maximum number of iterations to perform. If "default",
-                        uses the class_obj.opts['MaxIterShape'] value.
+    kind = class_obj.opts["R_phys"][1]
+    ratio = {
+        "equatorial": class_obj.R_eq_to_R_m,
+        "polar": class_obj.R_po_to_R_m,
+    }.get(kind)
+
+    if ratio is None:  # 'mean' is consistent by construction
+        return
+
+    given = class_obj.opts["R_phys"][0]
+    calculated = ratio * class_obj.li[0]
+
+    if not np.isclose(calculated, given):
+        warn(
+            "Your provided {which} radius is not consistent with the shape of "
+            "the planet calculated by PyToF! Your value: {given:.5e} / PyToF "
+            "value: {calculated:.5e}",
+            PyToFWarning,
+            stacklevel=3,
+            which=kind,
+            given=given,
+            calculated=calculated,
+        )
+
+
+def _relax_to_shape(class_obj, maxiter="default"):
+    """
+    Runs AlgoToF.Algorithm on the current level surfaces and densities and
+    stores the results in class_obj. Returns the Algorithm output, which says
+    whether it converged. Does not warn, since relax_to_barotrope() and
+    relax_to_density() deliberately call this with a small maxiter.
     """
 
     # Initialize variables:
@@ -712,14 +687,12 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
     # Measure ToF performance:
     toc = time.time()
 
-    # Verbosity output:
-    if class_obj.opts["verbosity"] > 2:
-        print(
-            "\n"
-            f"{c.INFO}Relaxing to shape done in "
-            f"{c.NUMB}{toc - tic:.2e} "
-            f"{c.INFO}seconds.{c.ENDC}"
-        )
+    say(
+        class_obj.opts["verbosity"],
+        3,
+        "Relaxing to shape done in {seconds:.2e} seconds.",
+        seconds=toc - tic,
+    )
 
     # Save results:
     class_obj.A0 = out.A0  # inside->outside instead of outside->inside since
@@ -732,40 +705,35 @@ def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
     class_obj.R_po_to_R_m = out.R_po_to_R_m
     class_obj.opts["use_simpson"] = out.use_simpson
 
-    if check_consistency:
-        # Check equatorial radius consistency
-        if class_obj.opts["R_phys"][1] == "equatorial" and not np.isclose(
-            class_obj.R_eq_to_R_m * class_obj.li[0],
-            class_obj.opts["R_phys"][0],
-        ):
-            print(
-                f"{c.WARN}WARNING: "
-                f"{c.INFO}Your provided equatorial radius is not consistent "
-                f"with the shape of the planet calculated by PyToF!{c.ENDC}"
-            )
-            print(
-                f"{c.INFO}Your value: {c.NUMB}"
-                f"{class_obj.opts['R_phys'][0]:.5e} {c.INFO}/ PyToF value: "
-                f"{c.NUMB}{class_obj.R_eq_to_R_m * class_obj.li[0]:.5e}"
-                f"{c.ENDC}"
-            )
+    return out
 
-        # Check polar radius consistency
-        if class_obj.opts["R_phys"][1] == "polar" and not np.isclose(
-            class_obj.R_po_to_R_m * class_obj.li[0],
-            class_obj.opts["R_phys"][0],
-        ):
-            print(
-                f"{c.WARN}WARNING: "
-                f"{c.INFO}Your provided polar radius is not consistent with "
-                f"the shape of the planet calculated by PyToF!{c.ENDC}"
-            )
-            print(
-                f"{c.INFO}Your value: {c.NUMB}"
-                f"{class_obj.opts['R_phys'][0]:.5e} {c.INFO}/ PyToF value: "
-                f"{c.NUMB}{class_obj.R_po_to_R_m * class_obj.li[0]:.5e}"
-                f"{c.ENDC}"
-            )
+
+def relax_to_shape(class_obj, check_consistency=True, maxiter="default"):
+    """
+    Calls Algorithm from AlgoToF until either the accuray given by
+    class_obj.opts['dJ_tol'] is fulfilled or maxiter is reached.
+
+    check_consistency:  If True, checks whether the user provided radius is
+                        consistent with the shape of the planet calculated by
+                        PyToF
+    maxiter:            Maximum number of iterations to perform. If "default",
+                        uses the class_obj.opts['MaxIterShape'] value.
+    """
+
+    out = _relax_to_shape(class_obj, maxiter)
+
+    if not out.converged:
+        warn(
+            "Theory of Figures did not converge: max(dJs) = {dJ:.0e} > "
+            "{tol:.0e} = dJ_tol after maxiter = {maxiter} iterations.",
+            ConvergenceWarning,
+            dJ=out.dJ_max,
+            tol=class_obj.opts["dJ_tol"],
+            maxiter=out.it + 1,
+        )
+
+    if check_consistency:
+        _check_radius_consistency(class_obj)
 
     return out.it
 
@@ -785,7 +753,7 @@ def relax_to_barotrope(class_obj):
     class_obj.bugfix_iter = 0
 
     # Call relax_to_shape() and ensure consistency for the first time:
-    relax_to_shape(class_obj, check_consistency=False, maxiter=2)
+    _relax_to_shape(class_obj, maxiter=2)
     _ensure_consistency(class_obj)
     IterBar = 1
 
@@ -826,10 +794,10 @@ def relax_to_barotrope(class_obj):
 
         # Warning if not converged:
         if IterUpdate == class_obj.opts["MaxIterUpdate"]:
-            _print_convergence_warning_drho(class_obj, drho)
+            _warn_not_converged_drho(class_obj, drho)
 
         # Call relax_to_shape():
-        relax_to_shape(class_obj, check_consistency=False, maxiter=2)
+        _relax_to_shape(class_obj, maxiter=2)
 
         # Store old values:
         old_m = class_obj.m_rot_calc
@@ -864,16 +832,15 @@ def relax_to_barotrope(class_obj):
 
     # Warning if not converged:
     if IterBar == class_obj.opts["MaxIterBar"]:
-        _print_convergence_warning(class_obj, drot, dJs, drho)
+        _warn_not_converged(class_obj, drot, dJs, drho, "MaxIterBar")
 
     # Verbosity output:
-    if class_obj.opts["verbosity"] > 1:
-        print(
-            "\n"
-            f"{c.INFO}Relaxing to barotrope done in "
-            f"{c.NUMB}{toc - tic:.2e} "
-            f"{c.INFO}seconds.{c.ENDC}"
-        )
+    say(
+        class_obj.opts["verbosity"],
+        2,
+        "Relaxing to barotrope done in {seconds:.2e} seconds.",
+        seconds=toc - tic,
+    )
 
     return IterBar
 
@@ -893,7 +860,7 @@ def relax_to_density(class_obj):
     class_obj.bugfix_iter = 0
 
     # Call relax_to_shape() and ensure consistency for the first time:
-    relax_to_shape(class_obj, check_consistency=False, maxiter=2)
+    _relax_to_shape(class_obj, maxiter=2)
     _ensure_consistency(class_obj)
     IterDen = 1
 
@@ -943,10 +910,10 @@ def relax_to_density(class_obj):
 
         # Warning if not converged:
         if IterUpdate == class_obj.opts["MaxIterUpdate"]:
-            _print_convergence_warning_drho(class_obj, drho)
+            _warn_not_converged_drho(class_obj, drho)
 
         # Call relax_to_shape():
-        relax_to_shape(class_obj, check_consistency=False, maxiter=2)
+        _relax_to_shape(class_obj, maxiter=2)
 
         # Store old values:
         old_m = class_obj.m_rot_calc
@@ -981,15 +948,14 @@ def relax_to_density(class_obj):
 
     # Warning if not converged:
     if IterDen == class_obj.opts["MaxIterDen"]:
-        _print_convergence_warning(class_obj, drot, dJs, drho)
+        _warn_not_converged(class_obj, drot, dJs, drho, "MaxIterDen")
 
     # Verbosity output:
-    if class_obj.opts["verbosity"] > 1:
-        print(
-            "\n"
-            f"{c.INFO}Relaxing to density done in "
-            f"{c.NUMB}{toc - tic:.2e} "
-            f"{c.INFO}seconds.{c.ENDC}"
-        )
+    say(
+        class_obj.opts["verbosity"],
+        2,
+        "Relaxing to density done in {seconds:.2e} seconds.",
+        seconds=toc - tic,
+    )
 
     return IterDen

@@ -11,8 +11,6 @@ import numpy as np
 import scipy
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-from PyToF.color import c
-
 
 def _default_mpl_opts():
     """
@@ -755,9 +753,7 @@ def plot_state_xy(
 
         else:
             raise KeyError(
-                c.WARN
-                + "Invalid keyword for what_model! Use 'baro' or 'dens'."
-                + c.ENDC
+                "Invalid keyword for what_model! Use 'baro' or 'dens'."
             )
 
         # Check for data consistency according to cost function results:
@@ -901,9 +897,7 @@ def plot_state_corr_xy(
 
         else:
             raise KeyError(
-                c.WARN
-                + "Invalid keyword for what_model! Use 'baro' or 'dens'."
-                + c.ENDC
+                "Invalid keyword for what_model! Use 'baro' or 'dens'."
             )
 
         # Check for data consistency according to cost function results:

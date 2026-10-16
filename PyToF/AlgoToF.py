@@ -5,7 +5,7 @@
 import numpy as np
 import scipy
 
-from PyToF.color import c
+from PyToF.messages import say
 from PyToF.PlotDebugToF import debug_AlgoToF_plot
 
 
@@ -86,11 +86,11 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
     mean_l[mean_l == 0] = np.spacing(np.min(mean_l[mean_l != 0]))
 
     assert mean_l.shape == rho.shape, (
-        c.WARN + "mean_l and rho do not have the same shape!" + c.ENDC
+        "mean_l and rho do not have the same shape!"
     )
-    assert m_rot >= 0, c.WARN + "m_rot is negative!" + c.ENDC
+    assert m_rot >= 0, "m_rot is negative!"
     assert np.isscalar(opts["n_bin"]), (
-        c.WARN + "Vector n_bin feature not yet implemented!" + c.ENDC
+        "Vector n_bin feature not yet implemented!"
     )  # Idea: provide non-equidistant points
 
     # Define and initialize local variables:
@@ -119,6 +119,7 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
     indeces = range(0, N, int(max(np.round(N / opts["n_bin"]), 1)))
 
     # The loop following arXiv:1708.06177v1:
+    converged = False
     for it in range(opts["maxiter"]):
         # Equations (B.16) and (B.17) from arXiv:1708.06177v1:
         fs = SkipSpline_B1617(ss, z, indeces, opts)
@@ -143,32 +144,11 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
             dJs = np.ones_like(Js)
 
         if (it > 0) and (np.max(dJs) < opts["tol"]):
+            converged = True
             break
 
         # Update gravitational moment values:
         Js = new_Js
-
-    # Verbosity output:
-    string = (
-        f"{c.WARN}Convergence warning: max(dJs) = "
-        f"{c.NUMB}{np.max(dJs):.0e}"
-        f"{c.WARN} > "
-        f"{c.NUMB}{opts['tol']:.0e}"
-        f"{c.WARN} after maxiter = "
-        f"{c.NUMB}{opts['maxiter']}"
-        f"{c.WARN} iterations."
-        f"{c.ENDC}"
-    )
-
-    if (
-        (it == (opts["maxiter"] - 1))
-        and (opts["verbosity"] > 0)
-        and (np.max(dJs) > opts["tol"])
-    ):
-        print(string, end="\r")
-
-    elif opts["verbosity"] > 0:
-        print(" " * len(string), end="\r")
 
     # Output:
     class out:
@@ -176,6 +156,10 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
 
     # Number of iterations used by the algorithm:
     out.it = it
+    # Whether max(dJs) fell below opts["tol"] before opts["maxiter"] ran out:
+    out.converged = converged
+    # Largest relative change of the gravitational moments in the last step:
+    out.dJ_max = float(np.max(dJs))
     # Ratio of equatorial to outermost mean level surface:
     out.R_eq_to_R_m = R_eq_to_R_m
     # Ratio of equatorial to outermost mean level surface:
@@ -395,7 +379,7 @@ def B1617(ssarray, opts):
 
     else:
 
-            raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
+            raise ValueError("Unimplemented ToF order!")
     # ruff: enable=E501
     # fmt: on
 
@@ -464,13 +448,13 @@ def B9(fs, z, rho, rho_bar, opts):
 
     if opts["use_simpson"] and not np.allclose(np.diff(z), np.diff(z)[0]):
         opts["use_simpson"] = False
-        if opts["verbosity"] > 0:
-            print(
-                c.WARN
-                + "Reverting to the more stable and less accurate trapezoid "
-                + "rule for integration since the radius grid is non-uniform."
-                + c.ENDC
-            )
+        say(
+            opts["verbosity"],
+            1,
+            "Reverting to the more stable and less accurate trapezoid rule "
+            "for integration since the radius grid is non-uniform.",
+            kind="warn",
+        )
 
     if opts["use_simpson"]:
         h = z[1] - z[0]
@@ -531,22 +515,18 @@ def B9(fs, z, rho, rho_bar, opts):
 
     for i in range(opts["order"] + 1):
         assert np.isfinite(z ** -(2 * i + 3)).all(), (
-            c.WARN
-            + "Mean level surfaces array contains values so small that the "
-            + "inverse creates overflow errors when taken to some powers. "
-            + "Choose a larger minimum mean level surface!"
-            + c.ENDC
+            "Mean level surfaces array contains values so small that the "
+            "inverse creates overflow errors when taken to some powers. "
+            "Choose a larger minimum mean level surface!"
         )
 
         new_SS.append(rho / rho_bar * fs[i] - z ** -(2 * i + 3) * integral[i])
 
     for i in range(opts["order"] + 1):
         assert np.isfinite(z ** -(2 - 2 * i)).all(), (
-            c.WARN
-            + "Mean level surfaces array contains values so small that the "
-            + "inverse creates overflow errors when taken to some powers. "
-            + "Choose a larger minimum mean level surface!"
-            + c.ENDC
+            "Mean level surfaces array contains values so small that the "
+            "inverse creates overflow errors when taken to some powers. "
+            "Choose a larger minimum mean level surface!"
         )
 
         new_SS.append(
@@ -561,16 +541,15 @@ def B9(fs, z, rho, rho_bar, opts):
     if opts["use_simpson"] and not np.all(np.diff(new_SS[0]) <= 0):
         opts["use_simpson"] = False
 
-        if opts["verbosity"] > 0:
-            print(
-                c.WARN
-                + "Reverting to the more stable and less accurate trapezoid "
-                + "rule for integration since S_0, itself proportional to the "
-                + "enclosed mass function, has become non-monotonic. "
-                + "Discontinuities in the density gradient due to jumps in "
-                + "density are likely responsible."
-                + c.ENDC
-            )
+        say(
+            opts["verbosity"],
+            1,
+            "Reverting to the more stable and less accurate trapezoid rule "
+            "for integration since S_0, itself proportional to the enclosed "
+            "mass function, has become non-monotonic. Discontinuities in the "
+            "density gradient due to jumps in density are likely responsible.",
+            kind="warn",
+        )
 
         return B9(fs, z, rho, rho_bar, opts)
 
@@ -611,9 +590,7 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
     # Calculate As:
     if opts["H"] != 0:
-        raise NotImplementedError(
-            c.WARN + "H unequal to zero is not yet implemented!" + c.ENDC
-        )
+        raise NotImplementedError("H unequal to zero is not yet implemented!")
 
     # ruff: noqa: E501
     # fmt: off
@@ -911,7 +888,7 @@ def B1215(ssarray, SSarray, m_rot, z, opts):
 
     else:
 
-            raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
+            raise ValueError("Unimplemented ToF order!")
     # ruff: enable=E501
     # fmt: on
 
@@ -972,7 +949,7 @@ def SkipSpline_B1215(ss, SS, m_rot, z, indeces, opts):
 
     else:
 
-            raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
+            raise ValueError("Unimplemented ToF order!")
     # ruff: enable=E501
     # fmt: on
 
@@ -1070,20 +1047,16 @@ def B111(ss, SS, R_m_to_R_ref, opts):
 
     else:
 
-            raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
+            raise ValueError("Unimplemented ToF order!")
     # ruff: enable=E501
     # fmt: on
 
     # Sanity check:
     assert R_eq_to_R_m >= 1.0, (
-        c.WARN
-        + "Equatorial radius is smaller than mean outer level surface!"
-        + c.ENDC
+        "Equatorial radius is smaller than mean outer level surface!"
     )
     assert R_po_to_R_m <= 1.0, (
-        c.WARN
-        + "Polar radius is bigger than mean outer level surface!"
-        + c.ENDC
+        "Polar radius is bigger than mean outer level surface!"
     )
 
     # Intialize gravitational moment storage:
@@ -1129,9 +1102,7 @@ def B4(ss, SS, m_rot, z, opts):
 
     # Calculate A0:
     if opts["H"] != 0:
-        raise NotImplementedError(
-            c.WARN + "H unequal to zero is not yet implemented!" + c.ENDC
-        )
+        raise NotImplementedError("H unequal to zero is not yet implemented!")
 
     # ruff: noqa: E501
     # fmt: off
@@ -1280,7 +1251,7 @@ def B4(ss, SS, m_rot, z, opts):
 
     else:
 
-            raise ValueError(c.WARN + "Unimplemented ToF order!" + c.ENDC)
+            raise ValueError("Unimplemented ToF order!")
     # ruff: enable=E501
     # fmt: on
 
