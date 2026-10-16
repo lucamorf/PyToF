@@ -137,7 +137,7 @@ def _pressurize(class_obj):
         class_obj.U, class_obj.li, edge_order=2
     )
 
-    if class_obj.opts["use_simpson"]:
+    if class_obj.simpson_in_use:
         class_obj.Pi = class_obj.opts[
             "P0"
         ] - scipy.integrate.cumulative_simpson(
@@ -155,10 +155,10 @@ def _pressurize(class_obj):
             class_obj, new=False, iteration=class_obj.bugfix_iter
         )
 
-    if class_obj.opts["use_simpson"] and (
+    if class_obj.simpson_in_use and (
         not (class_obj.Pi >= 0).all() or not (np.diff(class_obj.Pi) >= 0).all()
     ):
-        class_obj.opts["use_simpson"] = False
+        class_obj._simpson_failed = True
         say(
             class_obj.opts["verbosity"],
             1,
@@ -305,13 +305,12 @@ def get_Js_errors(class_obj):
         )
         return 0
 
-    if class_obj.opts["use_simpson"]:
+    if class_obj.simpson_in_use:
         say(
             class_obj.opts["verbosity"],
             1,
-            "The option use_simpson is {flag}. This ensures the highest "
-            "possible accuracy.",
-            flag=True,
+            "Simpson's rule is in use. This ensures the highest possible "
+            "accuracy.",
         )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
@@ -319,10 +318,9 @@ def get_Js_errors(class_obj):
         say(
             class_obj.opts["verbosity"],
             1,
-            "The option use_simpson is {flag}. This yields a reduced "
-            "accuracy. PyToF may have set this flag to {flag} without user "
-            "input to mitigate stability issues.",
-            flag=False,
+            "The trapezoid rule is in use. This yields a reduced accuracy. "
+            "Either the option use_simpson is False or PyToF switched to the "
+            "trapezoid rule on its own to mitigate stability issues.",
         )
         HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
@@ -340,8 +338,9 @@ def get_Js_errors(class_obj):
         rel_error = rel_error_10
 
     # Negative n_bin is equivalent to n_bin = N, see AlgoToF.py:
-    if class_obj.opts["n_bin"] < 0:
-        class_obj.opts["n_bin"] = class_obj.opts["N"]
+    n_bin = class_obj.opts["n_bin"]
+    if n_bin < 0:
+        n_bin = class_obj.opts["N"]
 
     # n_bin<4 throws an error in the interpolation anyways:
     mask = Ns_n_bins[:, 1] >= 4
@@ -359,7 +358,7 @@ def get_Js_errors(class_obj):
                 * 10
                 ** err_func(
                     np.log2(class_obj.opts["N"]),
-                    np.log2(class_obj.opts["n_bin"]),
+                    np.log2(n_bin),
                 )
             )
 
@@ -681,7 +680,7 @@ def _relax_to_shape(class_obj, maxiter="default"):
         ss_initial=class_obj.ss,
         alphas=alphas,
         H=class_obj.opts["H"],
-        use_simpson=class_obj.opts["use_simpson"],
+        use_simpson=class_obj.simpson_in_use,
     )
 
     # Measure ToF performance:
@@ -703,7 +702,8 @@ def _relax_to_shape(class_obj, maxiter="default"):
     # AlgoToF uses a different ordering logic!
     class_obj.R_eq_to_R_m = out.R_eq_to_R_m
     class_obj.R_po_to_R_m = out.R_po_to_R_m
-    class_obj.opts["use_simpson"] = out.use_simpson
+    if class_obj.simpson_in_use and not out.use_simpson:
+        class_obj._simpson_failed = True
 
     return out
 

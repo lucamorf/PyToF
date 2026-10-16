@@ -17,7 +17,7 @@ from PyToF.FunctionsToF import (
     set_barotrope,
     set_density_function,
 )
-from PyToF.messages import say, warn
+from PyToF.messages import say
 from PyToF.MonteCarloToF import (
     baro_cost_function,
     classify_and_save_state,
@@ -26,6 +26,7 @@ from PyToF.MonteCarloToF import (
     run_dens_MC,
     set_check_param,
 )
+from PyToF.options import Options
 from PyToF.PlotToF import (
     plot_autocorr,
     plot_shape,
@@ -74,117 +75,6 @@ class ToF:
     plot_state_xy = plot_state_xy
     plot_state_corr_xy = plot_state_corr_xy
     plot_autocorr = staticmethod(plot_autocorr)  # does not take a ToF object
-
-    def _default_opts(self, kwargs):
-        """
-        This function implements the standard options used for the ToF class,
-        except for the kwargs given by the user.
-        """
-
-        opts = {
-            "N": 2**10,  # Number of gridpoints, i.e. level surfaces used
-            "n_bin": -1,  # Numbers of bins for calculation speed-up,
-            # -1 or n_bin==N means that the figure functions
-            # will be calculated for all the points supplied.
-            "order": 4,  # Order of the Theory of Figures to be used
-            "dJ_tol": 1e-10,  # Relative tolerance in the iterative procedure
-            # for the Js
-            "drot_tol": 1e-10,  # Relative tolerance in the iterative procedure
-            # for the rotational parameter
-            "drho_tol": 1e-10,  # Relative tolerance in the iterative procedure
-            # for the densities
-            "MaxIterShape": 100,  # Maximum amount of iterations in AlgoToF
-            # when calling relax_to_shape()
-            "MaxIterUpdate": 100,  # Maximum amount of iterations when using
-            # _update_densities_barotrope() or _apply_atmosphere()
-            "MaxIterBar": 100,  # Maximum amount of times relax_to_barotrope()
-            # calls relax_to_shape()
-            "MaxIterDen": 100,  # Maximum amount of times relax_to_density()
-            # calls relax_to_shape()
-            "verbosity": 0,  # Higher numbers lead to more verbosity output in
-            # the console
-            "debug_plot": False,  # If True, debug plots will be saved, makes
-            # the code a lot slower
-            "use_simpson": True,  # If True, Simpson's rule will be used for
-            # pressure and AlgoToF integrals, otherwise the trapezoidal rule
-            ###############################################################
-            # The following numbers are taken from Wisdom & Hubbard 2016, #
-            # Differential rotation in Jupiter: A comparison of methods   #
-            ###############################################################
-            "G": 6.6738480e-11,  # Newtons gravitational constant in SI units
-            "M_phys": 126686536.1
-            * (1000) ** 3
-            / 6.6738480e-11,  # Mass of the planet in SI units
-            "R_ref": None,  # Reference radius of the planet in SI units
-            "R_phys": [
-                71492000,
-                "equatorial",
-            ],  # Physical radius of the planet in SI units, including type
-            # specification
-            "Period": 2
-            * np.pi
-            / np.sqrt(
-                (126686536.1 * (1000) ** 3 * 0.089195487) / (71492000**3)
-            ),  # Initial rotation period of the planet in SI units
-            "P0": 0,  # Initial surface pressure of the planet in SI units
-            "Target_Js": np.array(
-                [
-                    1.398851089834702e-2,  # J2
-                    -5.318281001092907e-4,  # J4
-                    3.011832290533641e-5,  # J6
-                    -2.132115710725050e-6,  # J8
-                    1.740671195871128e-7,  # J10
-                    -1.568219505602588e-8,  # J12
-                    1.518099230068580e-9,  # J14
-                    -1.551985393081485e-10,  # J16
-                    1.655948019619652e-11,  # J18
-                    -1.829544870258362e-12,  # J20
-                ]
-            ),
-            "Sigma_Js": np.array(
-                [
-                    np.spacing(1.398851089834702e-2),  # J2
-                    np.spacing(-5.318281001092907e-4),  # J4
-                    np.spacing(3.011832290533641e-5),  # J6
-                    np.spacing(-2.132115710725050e-6),  # J8
-                    np.spacing(1.740671195871128e-7),  # J10
-                    np.spacing(-1.568219505602588e-8),  # J12
-                    np.spacing(1.518099230068580e-9),  # J14
-                    np.spacing(-1.551985393081485e-10),  # J16
-                    np.spacing(1.655948019619652e-11),  # J18
-                    np.spacing(-1.829544870258362e-12),  # J20
-                ]
-            ),
-            "alphas": np.zeros(12),  # Barotropic differential rotation
-            # parameters
-            "rho_MAX": 2e4,  # Maximal density that is physically acceptable,
-            # in SI units
-            "P_MAX": 1e13,  # Maximal pressure that is physically acceptable,
-            # in SI units
-            "baro_param_init": None,  # Parameters used by the barotrope
-            # function set via set_barotrope()
-            "dens_param_init": None,  # Parameters used by the density
-            # function set via set_density_function()
-            "use_atmosphere": False,  # See _update_densities(), will use an
-            # atmospheric model for the outermost densities if True
-            "atmosphere": None,  # A function of the mean level surface and the
-            # pressure that returns the density compatible with an atmospheric
-            # model
-            "atmosphere_until": None,  # Pressure value in SI units that marks
-            # the earliest acceptable end of the atmospheric model
-            "H": 0.0,  # WORK IN PROGRESS
-        }
-
-        # Update the standard numerical parameters with the user input provided
-        # via the kwargs
-        for kw, v in kwargs.items():
-            if kw in opts:
-                opts[kw] = v
-
-            else:
-                warn("{kw} is an invalid keyword!", kw=kw)
-
-        return opts
 
     def _set_IC(self):
         """
@@ -255,21 +145,12 @@ class ToF:
 
     def __init__(self, **kwargs):
         """
-        Initializes the ToF class. Options can be provided via **kwargs,
-        otherwise the default options from _default_opts() will be implemented.
+        Initializes the ToF class. All options, see PyToF.options.Options,
+        can be provided as keyword arguments, everything else is set to the
+        defaults. Unknown or invalid options raise an error.
         """
 
-        # Set initial values:
-        self.opts = self._default_opts(kwargs)
-        assert len(self.opts["R_phys"]) == 2, (
-            "R_phys must be a list-like object with length 2! First entry: "
-            "float: radius in SI units, Second entry: string: 'equatorial', "
-            "'mean', 'polar'"
-        )
-        assert self.opts["R_phys"][1] in ["equatorial", "mean", "polar"], (
-            "The second entry of R_phys must be a string, options: "
-            "'equatorial', 'mean', 'polar'"
-        )
+        self.opts = Options.from_kwargs(**kwargs)
 
         if self.opts["R_ref"] is None:
             self.opts["R_ref"] = self.opts["R_phys"][0]
@@ -282,5 +163,19 @@ class ToF:
                 kind="warn",
             )
 
+        # PyToF switches to the trapezoid rule if Simpson's rule turns out to
+        # be unstable. This is a result of the calculation, not an option, and
+        # it persists between calls (it is deliberately not part of _set_IC):
+        self._simpson_failed = False
+
         # Set initial conditions:
         self._set_IC()
+
+    @property
+    def simpson_in_use(self):
+        """
+        Whether Simpson's rule is currently used for the integrals: the
+        option use_simpson, unless PyToF had to give it up for stability.
+        """
+
+        return bool(self.opts["use_simpson"]) and not self._simpson_failed

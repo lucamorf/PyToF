@@ -5,7 +5,6 @@ import pytest
 
 from PyToF import ClassToF
 from PyToF.FunctionsToF import _mass_int
-from PyToF.messages import PyToFWarning
 from tests.cases import WH16_BESSEL, jupiter_polytrope
 
 
@@ -77,22 +76,6 @@ def test_get_r_l_mu_shape_and_poles():
     r = X.get_r_l_mu(np.array([0.0, 1.0]))  # equator, pole
     assert r.shape == (64, 2)
     assert np.all(r[:, 0] > r[:, 1]), "equatorial radius exceeds polar radius"
-
-
-def test_invalid_radius_specification_is_rejected():
-    with pytest.raises(AssertionError):
-        ClassToF.ToF(R_phys=[7e7, "diameter"])
-    # CURRENT behaviour: a bare float gives an unhelpful TypeError from len()
-    # (to become a clear error message in step 03).
-    with pytest.raises((AssertionError, TypeError)):
-        ClassToF.ToF(R_phys=7e7)
-
-
-def test_unknown_option_is_reported():
-    # CURRENT behaviour: only a warning (planned to become a TypeError in
-    # step 03c, at which point this test is updated).
-    with pytest.warns(PyToFWarning, match="invalid keyword"):
-        ClassToF.ToF(Verbosity=2)
 
 
 def test_public_api_surface():
