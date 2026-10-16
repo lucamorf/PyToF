@@ -152,7 +152,7 @@ def _pressurize(class_obj):
 
     if class_obj.opts["debug_plot"]:
         debug_FunctionsToF_plot(
-            class_obj, new=False, iteration=class_obj.bugfix_iter
+            class_obj, new=False, iteration=class_obj._debug_iteration
         )
 
     if class_obj.simpson_in_use and (
@@ -287,7 +287,7 @@ def _warn_not_converged(class_obj, drot, dJs, drho, max_iter_name):
 
 def get_Js_errors(class_obj):
     """
-    This function is called by relax_to_shape() and fills class_obj.Js_error
+    This function is called by relax_to_shape() and fills class_obj.Js_errors
     error estimates for the gravitational moments Js calculated by the Theory
     of Figures based on the results from PyToF_Accuracy_and_Convergence.ipynb.
     """
@@ -354,7 +354,7 @@ def get_Js_errors(class_obj):
                 np.log2(points), np.log10(values)
             )
 
-            class_obj.Js_error[i] = abs(
+            class_obj.Js_errors[i] = abs(
                 J
                 * 10
                 ** err_func(
@@ -363,7 +363,7 @@ def get_Js_errors(class_obj):
                 )
             )
 
-            if np.isnan(class_obj.Js_error[i]):
+            if np.isnan(class_obj.Js_errors[i]):
                 warn(
                     "Tuple (N, n_bin) outside range that has been tested for "
                     "accuracy. PyToF provides no error estimates."
@@ -751,7 +751,7 @@ def relax_to_barotrope(class_obj):
     tic = time.time()
 
     # Only relevant if debug plots are activated:
-    class_obj.bugfix_iter = 0
+    class_obj._debug_iteration = 0
 
     # Call relax_to_shape() and ensure consistency for the first time:
     _relax_to_shape(class_obj, maxiter=2)
@@ -768,7 +768,7 @@ def relax_to_barotrope(class_obj):
 
         if class_obj.opts["debug_plot"]:
             debug_FunctionsToF_plot(
-                class_obj, new=True, iteration=class_obj.bugfix_iter
+                class_obj, new=True, iteration=class_obj._debug_iteration
             )
 
         # Converge on densities:
@@ -791,7 +791,7 @@ def relax_to_barotrope(class_obj):
             IterUpdate += 1
 
         # Only relevant if debug plots are activated:
-        class_obj.bugfix_iter += 1
+        class_obj._debug_iteration += 1
 
         # Warning if not converged:
         if IterUpdate == class_obj.opts["max_iter_update"]:
@@ -858,7 +858,7 @@ def relax_to_density(class_obj):
     tic = time.time()
 
     # Only relevant if debug plots are activated:
-    class_obj.bugfix_iter = 0
+    class_obj._debug_iteration = 0
 
     # Call relax_to_shape() and ensure consistency for the first time:
     _relax_to_shape(class_obj, maxiter=2)
@@ -875,7 +875,7 @@ def relax_to_density(class_obj):
 
         if class_obj.opts["debug_plot"]:
             debug_FunctionsToF_plot(
-                class_obj, new=True, iteration=class_obj.bugfix_iter
+                class_obj, new=True, iteration=class_obj._debug_iteration
             )
 
         # Converge on densities, this loop terminates after one iteration if no
@@ -907,7 +907,7 @@ def relax_to_density(class_obj):
             IterUpdate += 1
 
         # Only relevant if debug plots are activated:
-        class_obj.bugfix_iter += 1
+        class_obj._debug_iteration += 1
 
         # Warning if not converged:
         if IterUpdate == class_obj.opts["max_iter_update"]:

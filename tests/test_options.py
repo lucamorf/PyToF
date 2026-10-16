@@ -216,3 +216,32 @@ def test_new_names_do_not_warn():
         opts = Options.from_kwargs(max_iter_barotrope=3, target_Js=[1.0])
         opts["rho_max"] = 1e4
         assert opts.max_iter_barotrope == 3
+
+
+# -------------------------------------------------- renamed attributes
+
+
+def test_reset_restores_a_fresh_object():
+    fresh = ClassToF.ToF(N=64, order=4, R_ref=71492000)
+    X = jupiter_polytrope(4, 64)
+    assert not np.array_equal(X.Js, fresh.Js)  # it really was used
+
+    X.reset()
+
+    for name in ["li", "rhoi", "Pi", "Js", "Js_errors", "A0", "U"]:
+        np.testing.assert_array_equal(getattr(X, name), getattr(fresh, name))
+    for name in ["m_rot_calc", "R_calc", "R_eq_to_R_m", "R_po_to_R_m"]:
+        assert getattr(X, name) == getattr(fresh, name)
+
+
+def test_old_attribute_names_still_work_but_warn():
+    X = ClassToF.ToF(N=32)
+    with pytest.warns(RenamedWarning, match="reset"):
+        X._set_IC()
+    with pytest.warns(RenamedWarning, match="Js_errors") as record:
+        errors = X.Js_error
+    assert record[0].filename == __file__
+    assert errors is X.Js_errors
+    with pytest.warns(RenamedWarning):
+        X.Js_error = np.zeros(5)
+    assert np.all(X.Js_errors == 0)

@@ -17,7 +17,7 @@ from PyToF.FunctionsToF import (
     set_barotrope,
     set_density_function,
 )
-from PyToF.messages import say
+from PyToF.messages import RenamedWarning, say, warn
 from PyToF.MonteCarloToF import (
     baro_cost_function,
     classify_and_save_state,
@@ -76,9 +76,13 @@ class ToF:
     plot_state_corr_xy = plot_state_corr_xy
     plot_autocorr = staticmethod(plot_autocorr)  # does not take a ToF object
 
-    def _set_IC(self):
+    def reset(self):
         """
-        Initializes...
+        Resets all results to the initial conditions given by the options, so
+        that a new relaxation starts from scratch. Does not touch the options
+        and does not undo a fallback from Simpson's rule (simpson_in_use).
+
+        Sets...
 
         - li:               Array, level surfaces l, Eq. (B.1) in
                             arXiv:1708.06177v1
@@ -86,7 +90,7 @@ class ToF:
         - Pi:               Array, pressures at the level surfaces li
         - Js:               Array, gravitational harmonics, Eq. (B.11) in
                             arXiv:1708.06177v1
-        - Js_error          Array, estimated errors of the gravitational
+        - Js_errors:         Array, estimated errors of the gravitational
                             harmonics Js, only if no binning or differential
                             rotation is used
         - R_calc            Float, calculated equatorial radius in SI units
@@ -124,7 +128,7 @@ class ToF:
         )
         self.Pi = np.zeros(self.opts["N"])
         self.Js = np.hstack((-1, np.zeros(self.opts["order"])))
-        self.Js_error = np.hstack(
+        self.Js_errors = np.hstack(
             (np.nan, np.nan * np.zeros(self.opts["order"]))
         )
         self.R_calc = self.opts["R_phys"][0]
@@ -165,11 +169,11 @@ class ToF:
 
         # PyToF switches to the trapezoid rule if Simpson's rule turns out to
         # be unstable. This is a result of the calculation, not an option, and
-        # it persists between calls (it is deliberately not part of _set_IC):
+        # it persists between calls (it is deliberately not part of reset):
         self._simpson_failed = False
 
         # Set initial conditions:
-        self._set_IC()
+        self.reset()
 
     @property
     def simpson_in_use(self):
@@ -179,3 +183,34 @@ class ToF:
         """
 
         return bool(self.opts["use_simpson"]) and not self._simpson_failed
+
+    # ---------------------------------------------------- renamed, still work
+    def _set_IC(self):
+        """Old name of reset()."""
+
+        warn(
+            "ToF._set_IC() was renamed to ToF.reset(). The old name still "
+            "works but will be removed in a future version.",
+            RenamedWarning,
+        )
+        self.reset()
+
+    @property
+    def Js_error(self):
+        """Old name of Js_errors."""
+
+        warn(
+            "ToF.Js_error was renamed to ToF.Js_errors. The old name still "
+            "works but will be removed in a future version.",
+            RenamedWarning,
+        )
+        return self.Js_errors
+
+    @Js_error.setter
+    def Js_error(self, value):
+        warn(
+            "ToF.Js_error was renamed to ToF.Js_errors. The old name still "
+            "works but will be removed in a future version.",
+            RenamedWarning,
+        )
+        self.Js_errors = value

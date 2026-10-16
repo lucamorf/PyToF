@@ -919,7 +919,7 @@ def plot_state_corr_xy(
 
         # Save results:
         Js_list.append(class_obj.Js)
-        Js_err_list.append(class_obj.Js_error)
+        Js_err_list.append(class_obj.Js_errors)
         color_list.append(color)
 
     # Convert storage lists to arrays:

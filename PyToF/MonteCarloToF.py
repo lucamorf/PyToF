@@ -110,7 +110,7 @@ def baro_cost_function(class_obj, param, return_sum=True):
             return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Reset to initial conditions:
-    class_obj._set_IC()
+    class_obj.reset()
 
     # Update the internal parameters:
     class_obj.baro_param_calc = param
@@ -170,7 +170,7 @@ def dens_cost_function(class_obj, param, return_sum=True):
             return [-np.inf] * len(class_obj.opts["target_Js"])
 
     # Reset to initial conditions:
-    class_obj._set_IC()
+    class_obj.reset()
 
     # Get densities according to class_obj.density_function():
     class_obj.rhoi = class_obj.density_function(
@@ -260,7 +260,7 @@ def run_baro_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
             )
 
         # Reset to initial conditions:
-        class_obj._set_IC()
+        class_obj.reset()
 
         # Update the internal parameters:
         class_obj.baro_param_calc = param_0[i, :]
@@ -411,7 +411,7 @@ def run_dens_MC(class_obj, nwalkers, steps, Ncores=8, parallelize=False):
             )
 
         # Reset to initial conditions:
-        class_obj._set_IC()
+        class_obj.reset()
 
         # Get densities according to class_obj.density_function():
         class_obj.rhoi = class_obj.density_function(

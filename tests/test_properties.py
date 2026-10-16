@@ -67,8 +67,8 @@ def test_gravitational_harmonics_alternate_in_sign():
 def test_js_errors_are_finite_and_positive():
     X = jupiter_polytrope(4, N=256)
     X.get_Js_errors()
-    assert np.all(np.isfinite(X.Js_error[1:]))
-    assert np.all(X.Js_error[1:] > 0)
+    assert np.all(np.isfinite(X.Js_errors[1:]))
+    assert np.all(X.Js_errors[1:] > 0)
 
 
 def test_get_r_l_mu_shape_and_poles():
@@ -106,7 +106,7 @@ def test_public_api_surface():
         "rhoi",
         "Pi",
         "Js",
-        "Js_error",
+        "Js_errors",
         "R_calc",
         "ss",
         "SS",
