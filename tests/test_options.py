@@ -19,15 +19,15 @@ def test_defaults_are_the_wisdom_hubbard_jupiter():
     assert opts["order"] == 4
     assert opts["R_phys"] == [71492000, "equatorial"]
     assert opts["M_phys"] == 126686536.1 * (1000) ** 3 / 6.6738480e-11
-    assert opts["target_Js"][0] == 1.398851089834702e-2
+    assert opts["baro_param_init"] is None
     assert opts["alphas"].shape == (12,)
 
 
 def test_array_defaults_are_not_shared_between_instances():
     a, b = Options(), Options()
-    a["target_Js"][0] = 0.0
+    a["alphas"][0] = 1.0
     a["R_phys"][0] = 1.0
-    assert b["target_Js"][0] != 0.0
+    assert b["alphas"][0] == 0.0
     assert b["R_phys"][0] == 71492000
 
 
@@ -163,10 +163,6 @@ RENAMED = {
     "MaxIterUpdate": "max_iter_update",
     "MaxIterBar": "max_iter_barotrope",
     "MaxIterDen": "max_iter_density",
-    "Target_Js": "target_Js",
-    "Sigma_Js": "sigma_Js",
-    "rho_MAX": "rho_max",
-    "P_MAX": "P_max",
 }
 
 
@@ -216,8 +212,8 @@ def test_new_names_do_not_warn():
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        opts = Options.from_kwargs(max_iter_barotrope=3, target_Js=[1.0])
-        opts["rho_max"] = 1e4
+        opts = Options.from_kwargs(max_iter_barotrope=3, max_iter_update=4)
+        opts["max_iter_density"] = 5
         assert opts.max_iter_barotrope == 3
 
 

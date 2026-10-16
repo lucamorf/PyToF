@@ -49,10 +49,6 @@ RENAMED = {
     "MaxIterUpdate": "max_iter_update",
     "MaxIterBar": "max_iter_barotrope",
     "MaxIterDen": "max_iter_density",
-    "Target_Js": "target_Js",
-    "Sigma_Js": "sigma_Js",
-    "rho_MAX": "rho_max",
-    "P_MAX": "P_max",
 }
 
 RADIUS_KINDS = ("equatorial", "mean", "polar")
@@ -149,19 +145,6 @@ class Options:
         "planet",
     )
     P0: float = _option(0, "Surface pressure in SI units.", "planet")
-    target_Js: np.ndarray = _option(
-        lambda: np.array(_JS),
-        "Observed gravitational moments J2, J4, ... used by the cost "
-        "function.",
-        "planet",
-        factory=True,
-    )
-    sigma_Js: np.ndarray = _option(
-        lambda: np.array([np.spacing(j) for j in _JS]),
-        "1-sigma uncertainties of target_Js.",
-        "planet",
-        factory=True,
-    )
     alphas: np.ndarray = _option(
         lambda: np.zeros(12),
         "Barotropic differential rotation parameters in m^2 s^-2 "
@@ -170,20 +153,9 @@ class Options:
         factory=True,
     )
     # --------------------------------------------------------------- model
-    rho_max: float = _option(
-        2e4, "Largest physically acceptable density in SI units.", "model"
-    )
-    P_max: float = _option(
-        1e13, "Largest physically acceptable pressure in SI units.", "model"
-    )
     baro_param_init: list = _option(
         None,
         "Parameters of the barotrope set via set_barotrope().",
-        "model",
-    )
-    dens_param_init: list = _option(
-        None,
-        "Parameters of the density function set via set_density_function().",
         "model",
     )
     use_atmosphere: bool = _option(

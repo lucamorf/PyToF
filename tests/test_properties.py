@@ -86,18 +86,11 @@ def test_public_api_surface():
         "relax_to_barotrope",
         "relax_to_density",
         "set_barotrope",
-        "set_density_function",
-        "set_check_param",
         "get_Js_errors",
         "get_NMoI",
         "get_Kn",
         "get_r_l_mu",
         "get_U_l_mu",
-        "run_baro_MC",
-        "run_dens_MC",
-        "baro_cost_function",
-        "dens_cost_function",
-        "classify_and_save_state",
     ]
     for name in methods:
         assert callable(getattr(X, name)), name

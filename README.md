@@ -13,7 +13,9 @@ Download or clone this repository, navigate into the directory and execute
 pip install .
 ```
 
-Note that the package requires numpy, scipy, matplotlib, emcee and tqdm.
+Note that the package requires numpy, scipy and matplotlib.
+
+Sampling the interior parameters of a planet (MCMC) is not part of PyToF; see the separate package PyToF_MCMC, which uses PyToF as a library.
 
 ## Basic usage
 
@@ -87,14 +89,6 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
 
 ![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_7_0.png "X.plot_shape()")
 ![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_7_0.png "X.plot_shape()")
-
-### X.plot_state_xy()
-
-![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_7_0.png "X.plot_state_xy()")
-
-### X.plot_state_xy_corr()
-
-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_7_0.png "X.plot_state_xy_corr()")
 
 ## Accuracy and Convergence
 

@@ -15,25 +15,12 @@ from PyToF.FunctionsToF import (
     relax_to_density,
     relax_to_shape,
     set_barotrope,
-    set_density_function,
 )
 from PyToF.messages import RenamedWarning, say, warn
-from PyToF.MonteCarloToF import (
-    baro_cost_function,
-    classify_and_save_state,
-    dens_cost_function,
-    run_baro_MC,
-    run_dens_MC,
-    run_mcmc,
-    set_check_param,
-)
 from PyToF.options import Options
 from PyToF.PlotToF import (
-    plot_autocorr,
     plot_shape,
     plot_ss,
-    plot_state_corr_xy,
-    plot_state_xy,
     plot_xy,
 )
 
@@ -66,9 +53,9 @@ class ToF:
     """
     This class contains standard routines when using the Theory of Figures.
 
-    The routines themselves live in FunctionsToF.py, MonteCarloToF.py and
-    PlotToF.py; they take the ToF object as their first argument and are
-    attached below as ordinary methods.
+    The routines themselves live in FunctionsToF.py and PlotToF.py; they
+    take the ToF object as their first argument and are attached below as
+    ordinary methods.
     """
 
     # Shape and density relaxation:
@@ -76,7 +63,6 @@ class ToF:
     relax_to_barotrope = relax_to_barotrope
     relax_to_density = relax_to_density
     set_barotrope = set_barotrope
-    set_density_function = set_density_function
 
     # Derived quantities:
     get_Js_errors = get_Js_errors
@@ -85,22 +71,10 @@ class ToF:
     get_r_l_mu = get_r_l_mu
     get_U_l_mu = get_U_l_mu
 
-    # Monte Carlo sampling:
-    set_check_param = set_check_param
-    baro_cost_function = baro_cost_function
-    dens_cost_function = dens_cost_function
-    run_mcmc = run_mcmc
-    run_baro_MC = run_baro_MC
-    run_dens_MC = run_dens_MC
-    classify_and_save_state = classify_and_save_state
-
     # Plotting:
     plot_xy = plot_xy
     plot_shape = plot_shape
     plot_ss = plot_ss
-    plot_state_xy = plot_state_xy
-    plot_state_corr_xy = plot_state_corr_xy
-    plot_autocorr = staticmethod(plot_autocorr)  # does not take a ToF object
 
     def reset(self):
         """
@@ -134,8 +108,6 @@ class ToF:
                             outermost mean surface layer
         - baro_param_calc:  Possibly updated parameters used by the barotrope
                             function set via set_barotrope()
-        - dens_param_calc:  Possibly updated parameters used by the density
-                            function set via set_density_function()
         - atmosphere_index: Integer, defines the index of atmosphere transition
         """
 
@@ -175,7 +147,6 @@ class ToF:
         self.R_eq_to_R_m = 1.0
         self.R_po_to_R_m = 1.0
         self.baro_param_calc = self.opts["baro_param_init"]
-        self.dens_param_calc = self.opts["dens_param_init"]
         self.atmosphere_index = 0
 
     def __init__(self, **kwargs):

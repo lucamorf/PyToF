@@ -559,19 +559,6 @@ def set_barotrope(self, fun):
     self.barotrope = fun
 
 
-def set_density_function(self, fun):
-    """
-    This function allows the user to internally set the function relating the
-    density self.rhoi to the mean level surfaces self.li via
-    self.rhoi = fun(self.li, mass, param).
-
-    fun: Function handle for the density model.
-    """
-
-    # Set function:
-    self.density_function = fun
-
-
 def _check_radius_consistency(tof):
     """
     Warns if the radius provided via opts['R_phys'] differs from the radius of
