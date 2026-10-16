@@ -709,12 +709,17 @@ def relax_to_shape(self, check_consistency=True, maxiter="default"):
     return out.it
 
 
-def relax_to_barotrope(self):
+def _relax(self, update_densities, max_iter_name, name):
     """
-    Calls relax_to_shape() and _update_densities_barotrope() until either the
-    accuray given by self.opts['dJ_tol'], self.opts['drot_tol'] and
-    self.opts['drho_tol'] is fulfilled or
-    self.opts['max_iter_barotrope'] is reached.
+    Shared iteration of relax_to_barotrope() and relax_to_density(): calls
+    _relax_to_shape() and update_densities(self) alternately until the
+    tolerances dJ_tol, drot_tol and drho_tol are fulfilled or
+    self.opts[max_iter_name] is reached. Returns the number of iterations.
+
+    update_densities:   Function taking the ToF object and updating the
+                        pressure and the densities in place.
+    max_iter_name:      Name of the option limiting the iterations.
+    name:               Name used in messages, e.g. "barotrope".
     """
 
     # Measure ToF performance:
@@ -726,10 +731,10 @@ def relax_to_barotrope(self):
     # Call relax_to_shape() and ensure consistency for the first time:
     _relax_to_shape(self, maxiter=2)
     _ensure_consistency(self)
-    IterBar = 1
+    iteration = 1
 
     # Converge on gravitational moments:
-    while IterBar < self.opts["max_iter_barotrope"]:
+    while iteration < self.opts[max_iter_name]:
         # Store old gravitational moment values:
         old_Js = self.Js
 
@@ -741,13 +746,13 @@ def relax_to_barotrope(self):
                 self, new=True, iteration=self._debug_iteration
             )
 
-        # Converge on densities:
+        # Converge on densities (without an atmosphere this loop ends after
+        # one iteration for relax_to_density()):
         while IterUpdate < self.opts["max_iter_update"]:
             # Store old values:
             old_rho = self.rhoi
 
-            # Call _update_densities_barotrope():
-            _update_densities_barotrope(self)
+            update_densities(self)
 
             # Update drho, ignore first entry to avoid possible division by
             # zero:
@@ -796,24 +801,56 @@ def relax_to_barotrope(self):
             break
 
         # Update iteration parameter:
-        IterBar += 1
+        iteration += 1
 
     # Measure ToF performance:
     toc = time.time()
 
     # Warning if not converged:
-    if IterBar == self.opts["max_iter_barotrope"]:
-        _warn_not_converged(self, drot, dJs, drho, "max_iter_barotrope")
+    if iteration == self.opts[max_iter_name]:
+        _warn_not_converged(self, drot, dJs, drho, max_iter_name)
 
     # Verbosity output:
     say(
         self.opts["verbosity"],
         2,
-        "Relaxing to barotrope done in {seconds:.2e} seconds.",
+        "Relaxing to {name} done in {seconds:.2e} seconds.",
+        name=name,
         seconds=toc - tic,
     )
 
-    return IterBar
+    return iteration
+
+
+def _update_densities_given(tof):
+    """
+    Update step of relax_to_density(): the densities are given, so only the
+    pressure follows from hydrostatic equilibrium, optionally followed by the
+    atmospheric model.
+    """
+
+    # Calculates the pressure values according to hydrostatic equilibrium:
+    _pressurize(tof)
+
+    # Optional, use a provided atmospheric model:
+    if tof.opts["use_atmosphere"]:
+        _apply_atmosphere(tof)
+
+    # Ensure physical mass stays unaffacted:
+    _fixmass(tof)
+
+
+def relax_to_barotrope(self):
+    """
+    Calls relax_to_shape() and _update_densities_barotrope() until either the
+    accuray given by self.opts['dJ_tol'], self.opts['drot_tol'] and
+    self.opts['drho_tol'] is fulfilled or
+    self.opts['max_iter_barotrope'] is reached.
+    """
+
+    return _relax(
+        self, _update_densities_barotrope, "max_iter_barotrope", "barotrope"
+    )
 
 
 def relax_to_density(self):
@@ -824,109 +861,4 @@ def relax_to_density(self):
     self.opts['max_iter_density'] is reached.
     """
 
-    # Measure ToF performance:
-    tic = time.time()
-
-    # Only relevant if debug plots are activated:
-    self._debug_iteration = 0
-
-    # Call relax_to_shape() and ensure consistency for the first time:
-    _relax_to_shape(self, maxiter=2)
-    _ensure_consistency(self)
-    IterDen = 1
-
-    # Converge on gravitational moments:
-    while IterDen < self.opts["max_iter_density"]:
-        # Store old gravitational moment values:
-        old_Js = self.Js
-
-        # Define iteration counter for density loop:
-        IterUpdate = 1
-
-        if self.opts["debug_plot"]:
-            debug_FunctionsToF_plot(
-                self, new=True, iteration=self._debug_iteration
-            )
-
-        # Converge on densities, this loop terminates after one iteration if no
-        # atmosphere is provided:
-        while IterUpdate < self.opts["max_iter_update"]:
-            # Store old values:
-            old_rho = self.rhoi
-
-            # Calculates the pressure values according to hydrostatic
-            # equilibrium:
-            _pressurize(self)
-
-            # Optional, use a provided atmospheric model:
-            if self.opts["use_atmosphere"]:
-                _apply_atmosphere(self)
-
-            # Ensure physical mass stays unaffacted:
-            _fixmass(self)
-
-            # Update drho, ignore first entry to avoid possible division by
-            # zero:
-            drho = np.max(np.abs(self.rhoi[1:] / old_rho[1:] - 1))
-
-            # Check convergence:
-            if drho < self.opts["drho_tol"]:
-                break
-
-            # Update iteration parameter:
-            IterUpdate += 1
-
-        # Only relevant if debug plots are activated:
-        self._debug_iteration += 1
-
-        # Warning if not converged:
-        if IterUpdate == self.opts["max_iter_update"]:
-            _warn_not_converged_drho(self, drho)
-
-        # Call relax_to_shape():
-        _relax_to_shape(self, maxiter=2)
-
-        # Store old values:
-        old_m = self.m_rot_calc
-        old_rho = self.rhoi
-
-        # Ensure consistency:
-        _ensure_consistency(self)
-
-        # Check convergence, and address division by zero issues:
-        if old_m != 0:
-            drot = np.abs(self.m_rot_calc / old_m - 1)
-        else:
-            drot = 0.0
-
-        mask = ~np.logical_and(self.Js == 0, old_Js == 0)
-
-        dJs = np.max(np.abs(self.Js[mask] / old_Js[mask] - 1))
-        drho = np.max(np.abs(self.rhoi[1:] / old_rho[1:] - 1))
-
-        if (
-            drot < self.opts["drot_tol"]
-            and dJs < self.opts["dJ_tol"]
-            and drho < self.opts["drho_tol"]
-        ):
-            break
-
-        # Update iteration parameter:
-        IterDen += 1
-
-    # Measure ToF performance:
-    toc = time.time()
-
-    # Warning if not converged:
-    if IterDen == self.opts["max_iter_density"]:
-        _warn_not_converged(self, drot, dJs, drho, "max_iter_density")
-
-    # Verbosity output:
-    say(
-        self.opts["verbosity"],
-        2,
-        "Relaxing to density done in {seconds:.2e} seconds.",
-        seconds=toc - tic,
-    )
-
-    return IterDen
+    return _relax(self, _update_densities_given, "max_iter_density", "density")
