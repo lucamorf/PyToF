@@ -45,7 +45,6 @@ def test_classify_and_save_state(mc_model):
     assert rho_max.shape == (6,)
 
 
-@pytest.mark.slow
 def test_baro_mcmc_runs_parallel(mc_model):
     np.random.seed(0)
     state, _ = mc_model.run_baro_MC(6, 5, Ncores=2, parallelize=True)
