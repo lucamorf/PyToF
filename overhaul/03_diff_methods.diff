@@ -1,0 +1,152 @@
+diff --git a/PyToF/ClassToF.py b/PyToF/ClassToF.py
+index 7d89be9..43eaa74 100644
+--- a/PyToF/ClassToF.py
++++ b/PyToF/ClassToF.py
+@@ -2,19 +2,79 @@
+ # Author of this version: Luca Morf - luca.morf@uzh.ch #
+ ########################################################
+ 
+-import functools
+-
+ import numpy as np
+ import scipy
+ 
+ from PyToF.color import c
++from PyToF.FunctionsToF import (
++    get_Js_errors,
++    get_Kn,
++    get_NMoI,
++    get_r_l_mu,
++    get_U_l_mu,
++    relax_to_barotrope,
++    relax_to_density,
++    relax_to_shape,
++    set_barotrope,
++    set_density_function,
++)
++from PyToF.MonteCarloToF import (
++    baro_cost_function,
++    classify_and_save_state,
++    dens_cost_function,
++    run_baro_MC,
++    run_dens_MC,
++    set_check_param,
++)
++from PyToF.PlotToF import (
++    plot_autocorr,
++    plot_shape,
++    plot_ss,
++    plot_state_corr_xy,
++    plot_state_xy,
++    plot_xy,
++)
+ 
+ 
+ class ToF:
+     """
+     This class contains standard routines when using the Theory of Figures.
++
++    The routines themselves live in FunctionsToF.py, MonteCarloToF.py and
++    PlotToF.py; they take the ToF object as their first argument and are
++    attached below as ordinary methods.
+     """
+ 
++    # Shape and density relaxation:
++    relax_to_shape = relax_to_shape
++    relax_to_barotrope = relax_to_barotrope
++    relax_to_density = relax_to_density
++    set_barotrope = set_barotrope
++    set_density_function = set_density_function
++
++    # Derived quantities:
++    get_Js_errors = get_Js_errors
++    get_NMoI = get_NMoI
++    get_Kn = get_Kn
++    get_r_l_mu = get_r_l_mu
++    get_U_l_mu = get_U_l_mu
++
++    # Monte Carlo sampling:
++    set_check_param = set_check_param
++    baro_cost_function = baro_cost_function
++    dens_cost_function = dens_cost_function
++    run_baro_MC = run_baro_MC
++    run_dens_MC = run_dens_MC
++    classify_and_save_state = classify_and_save_state
++
++    # Plotting:
++    plot_xy = plot_xy
++    plot_shape = plot_shape
++    plot_ss = plot_ss
++    plot_state_xy = plot_state_xy
++    plot_state_corr_xy = plot_state_corr_xy
++    plot_autocorr = staticmethod(plot_autocorr)  # does not take a ToF object
++
+     def _default_opts(self, kwargs):
+         """
+         This function implements the standard options used for the ToF class,
+@@ -228,65 +288,3 @@ class ToF:
+ 
+         # Set initial conditions:
+         self._set_IC()
+-
+-        # Define routines for the user:
+-        from PyToF.FunctionsToF import (
+-            get_Js_errors,
+-            get_Kn,
+-            get_NMoI,
+-            get_r_l_mu,
+-            get_U_l_mu,
+-            relax_to_barotrope,
+-            relax_to_density,
+-            relax_to_shape,
+-            set_barotrope,
+-            set_density_function,
+-        )
+-
+-        self.get_Js_errors = functools.partial(get_Js_errors, self)
+-        self.get_NMoI = functools.partial(get_NMoI, self)
+-        self.get_Kn = functools.partial(get_Kn, self)
+-        self.get_r_l_mu = functools.partial(get_r_l_mu, self)
+-        self.set_barotrope = functools.partial(set_barotrope, self)
+-        self.set_density_function = functools.partial(
+-            set_density_function, self
+-        )
+-        self.relax_to_shape = functools.partial(relax_to_shape, self)
+-        self.relax_to_barotrope = functools.partial(relax_to_barotrope, self)
+-        self.relax_to_density = functools.partial(relax_to_density, self)
+-        self.get_U_l_mu = functools.partial(get_U_l_mu, self)
+-
+-        from PyToF.MonteCarloToF import (
+-            baro_cost_function,
+-            classify_and_save_state,
+-            dens_cost_function,
+-            run_baro_MC,
+-            run_dens_MC,
+-            set_check_param,
+-        )
+-
+-        self.set_check_param = functools.partial(set_check_param, self)
+-        self.baro_cost_function = functools.partial(baro_cost_function, self)
+-        self.dens_cost_function = functools.partial(dens_cost_function, self)
+-        self.run_baro_MC = functools.partial(run_baro_MC, self)
+-        self.run_dens_MC = functools.partial(run_dens_MC, self)
+-        self.classify_and_save_state = functools.partial(
+-            classify_and_save_state, self
+-        )
+-
+-        from PyToF.PlotToF import (
+-            plot_autocorr,
+-            plot_shape,
+-            plot_ss,
+-            plot_state_corr_xy,
+-            plot_state_xy,
+-            plot_xy,
+-        )
+-
+-        self.plot_xy = functools.partial(plot_xy, self)
+-        self.plot_shape = functools.partial(plot_shape, self)
+-        self.plot_ss = functools.partial(plot_ss, self)
+-        self.plot_state_xy = functools.partial(plot_state_xy, self)
+-        self.plot_state_corr_xy = functools.partial(plot_state_corr_xy, self)
+-
+-        self.plot_autocorr = plot_autocorr

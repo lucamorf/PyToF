@@ -6,7 +6,6 @@ import numpy as np
 import scipy
 
 from PyToF.messages import say
-from PyToF.PlotDebugToF import debug_AlgoToF_plot
 
 
 def default_opts():
@@ -480,6 +479,8 @@ def B9(fs, z, rho, rho_bar, opts):
         )
 
     if opts["debug_plot"]:
+        from PyToF.PlotDebugToF import debug_AlgoToF_plot
+
         h = z[1] - z[0]
         integral_simp = scipy.integrate.cumulative_simpson(
             integrand * np.gradient(domain, z, edge_order=2),

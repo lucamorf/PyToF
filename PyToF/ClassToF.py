@@ -18,11 +18,6 @@ from PyToF.FunctionsToF import (
 )
 from PyToF.messages import RenamedWarning, say, warn
 from PyToF.options import Options
-from PyToF.PlotToF import (
-    plot_shape,
-    plot_ss,
-    plot_xy,
-)
 
 
 def _renamed_attribute(old, new):
@@ -53,9 +48,9 @@ class ToF:
     """
     This class contains standard routines when using the Theory of Figures.
 
-    The routines themselves live in FunctionsToF.py and PlotToF.py; they
-    take the ToF object as their first argument and are attached below as
-    ordinary methods.
+    The routines themselves live in FunctionsToF.py; they take the ToF
+    object as their first argument and are attached below as ordinary
+    methods.
     """
 
     # Shape and density relaxation:
@@ -70,11 +65,6 @@ class ToF:
     get_Kn = get_Kn
     get_r_l_mu = get_r_l_mu
     get_U_l_mu = get_U_l_mu
-
-    # Plotting:
-    plot_xy = plot_xy
-    plot_shape = plot_shape
-    plot_ss = plot_ss
 
     def reset(self):
         """

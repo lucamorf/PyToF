@@ -13,7 +13,7 @@ Download or clone this repository, navigate into the directory and execute
 pip install .
 ```
 
-Note that the package requires numpy, scipy and matplotlib.
+The package requires numpy and scipy. matplotlib is only needed for the debug plots (`debug_plot=True`); install it with `pip install .[plot]`.
 
 Sampling the interior parameters of a planet (MCMC) is not part of PyToF; see the separate package PyToF_MCMC, which uses PyToF as a library.
 
@@ -81,14 +81,9 @@ J_6 = 5.1743e-06 +/- 4.5e-08
 J_8 = -1.6401e-07 +/- 1.4e-08
 ```
 
-## Plotting capabilities
+## Plotting
 
-Below you can find a few figures that illustrate PyToF's capabilities, in partiular when it comes to built-in plotting routines. For more, consider chapters 2 and 5 in the tutorial.
-
-### X.plot_shape()
-
-![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_7_0.png "X.plot_shape()")
-![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_7_0.png "X.plot_shape()")
+PyToF has no built-in plotting routines; the tutorial shows how to plot the shape and the profiles with plain matplotlib. The option `debug_plot=True` saves diagnostic figures of every iteration into the working directory (slow, for debugging only).
 
 ## Accuracy and Convergence
 

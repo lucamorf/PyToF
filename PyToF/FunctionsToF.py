@@ -10,7 +10,6 @@ import scipy
 
 import PyToF.AlgoToF as AlgoToF
 from PyToF.messages import ConvergenceWarning, PyToFWarning, say, warn
-from PyToF.PlotDebugToF import debug_FunctionsToF_plot
 
 
 def _mass_int(tof):
@@ -135,6 +134,8 @@ def _pressurize(tof):
         )
 
     if tof.opts["debug_plot"]:
+        from PyToF.PlotDebugToF import debug_FunctionsToF_plot
+
         debug_FunctionsToF_plot(tof, new=False, iteration=tof._debug_iteration)
 
     if tof.simpson_in_use and (
@@ -729,6 +730,8 @@ def _relax(self, update_densities, max_iter_name, name):
         IterUpdate = 1
 
         if self.opts["debug_plot"]:
+            from PyToF.PlotDebugToF import debug_FunctionsToF_plot
+
             debug_FunctionsToF_plot(
                 self, new=True, iteration=self._debug_iteration
             )

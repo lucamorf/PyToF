@@ -1,0 +1,2932 @@
+diff --git a/PyToF/ClassToF.py b/PyToF/ClassToF.py
+index 0476f6c..99a476c 100644
+--- a/PyToF/ClassToF.py
++++ b/PyToF/ClassToF.py
+@@ -15,25 +15,12 @@ from PyToF.FunctionsToF import (
+     relax_to_density,
+     relax_to_shape,
+     set_barotrope,
+-    set_density_function,
+ )
+ from PyToF.messages import RenamedWarning, say, warn
+-from PyToF.MonteCarloToF import (
+-    baro_cost_function,
+-    classify_and_save_state,
+-    dens_cost_function,
+-    run_baro_MC,
+-    run_dens_MC,
+-    run_mcmc,
+-    set_check_param,
+-)
+ from PyToF.options import Options
+ from PyToF.PlotToF import (
+-    plot_autocorr,
+     plot_shape,
+     plot_ss,
+-    plot_state_corr_xy,
+-    plot_state_xy,
+     plot_xy,
+ )
+ 
+@@ -66,9 +53,9 @@ class ToF:
+     """
+     This class contains standard routines when using the Theory of Figures.
+ 
+-    The routines themselves live in FunctionsToF.py, MonteCarloToF.py and
+-    PlotToF.py; they take the ToF object as their first argument and are
+-    attached below as ordinary methods.
++    The routines themselves live in FunctionsToF.py and PlotToF.py; they
++    take the ToF object as their first argument and are attached below as
++    ordinary methods.
+     """
+ 
+     # Shape and density relaxation:
+@@ -76,7 +63,6 @@ class ToF:
+     relax_to_barotrope = relax_to_barotrope
+     relax_to_density = relax_to_density
+     set_barotrope = set_barotrope
+-    set_density_function = set_density_function
+ 
+     # Derived quantities:
+     get_Js_errors = get_Js_errors
+@@ -85,22 +71,10 @@ class ToF:
+     get_r_l_mu = get_r_l_mu
+     get_U_l_mu = get_U_l_mu
+ 
+-    # Monte Carlo sampling:
+-    set_check_param = set_check_param
+-    baro_cost_function = baro_cost_function
+-    dens_cost_function = dens_cost_function
+-    run_mcmc = run_mcmc
+-    run_baro_MC = run_baro_MC
+-    run_dens_MC = run_dens_MC
+-    classify_and_save_state = classify_and_save_state
+-
+     # Plotting:
+     plot_xy = plot_xy
+     plot_shape = plot_shape
+     plot_ss = plot_ss
+-    plot_state_xy = plot_state_xy
+-    plot_state_corr_xy = plot_state_corr_xy
+-    plot_autocorr = staticmethod(plot_autocorr)  # does not take a ToF object
+ 
+     def reset(self):
+         """
+@@ -134,8 +108,6 @@ class ToF:
+                             outermost mean surface layer
+         - baro_param_calc:  Possibly updated parameters used by the barotrope
+                             function set via set_barotrope()
+-        - dens_param_calc:  Possibly updated parameters used by the density
+-                            function set via set_density_function()
+         - atmosphere_index: Integer, defines the index of atmosphere transition
+         """
+ 
+@@ -175,7 +147,6 @@ class ToF:
+         self.R_eq_to_R_m = 1.0
+         self.R_po_to_R_m = 1.0
+         self.baro_param_calc = self.opts["baro_param_init"]
+-        self.dens_param_calc = self.opts["dens_param_init"]
+         self.atmosphere_index = 0
+ 
+     def __init__(self, **kwargs):
+diff --git a/PyToF/FunctionsToF.py b/PyToF/FunctionsToF.py
+index 6b34222..c0347c1 100644
+--- a/PyToF/FunctionsToF.py
++++ b/PyToF/FunctionsToF.py
+@@ -559,19 +559,6 @@ def set_barotrope(self, fun):
+     self.barotrope = fun
+ 
+ 
+-def set_density_function(self, fun):
+-    """
+-    This function allows the user to internally set the function relating the
+-    density self.rhoi to the mean level surfaces self.li via
+-    self.rhoi = fun(self.li, mass, param).
+-
+-    fun: Function handle for the density model.
+-    """
+-
+-    # Set function:
+-    self.density_function = fun
+-
+-
+ def _check_radius_consistency(tof):
+     """
+     Warns if the radius provided via opts['R_phys'] differs from the radius of
+diff --git a/PyToF/MonteCarloToF.py b/PyToF/MonteCarloToF.py
+deleted file mode 100644
+index 950a417..0000000
+--- a/PyToF/MonteCarloToF.py
++++ /dev/null
+@@ -1,662 +0,0 @@
+-########################################################
+-# Author of this version: Luca Morf - luca.morf@uzh.ch #
+-########################################################
+-
+-
+-import functools
+-import multiprocessing
+-import os
+-import pickle
+-from collections.abc import Callable
+-from typing import NamedTuple
+-
+-import numpy as np
+-
+-from PyToF.messages import paint, say
+-from PyToF.sampling import (
+-    ConvergenceCriteria,
+-    FitSaver,
+-    MCMCResult,
+-    open_checkpoint,
+-    run_sampler,
+-)
+-
+-
+-def _check_phys(tof):
+-    """
+-    This function returns True if the current solutions
+-    (tof.rhoi, tof.Pi, tof.Js) are unphysical or consisting
+-    of NaN values. Returns False if everything is ok.
+-    """
+-
+-    # Density inversions are considered to be unphysical:
+-    if np.any(np.diff(tof.rhoi) < 0):
+-        say(
+-            tof.opts["verbosity"],
+-            2,
+-            "Physicality warning: density inversion!",
+-            kind="warn",
+-        )
+-
+-        return True
+-
+-    # There should be no NaN values:
+-    elif (
+-        np.isnan(tof.rhoi).any()
+-        or np.isnan(tof.Pi).any()
+-        or np.isnan(tof.Js).any()
+-    ):
+-        say(
+-            tof.opts["verbosity"],
+-            2,
+-            "Physicality warning: NaN values!",
+-            kind="warn",
+-        )
+-
+-        return True
+-
+-    # There should be no negative density or pressure values:
+-    elif (np.min(tof.rhoi) < 0) or (np.min(tof.Pi) < 0):
+-        say(
+-            tof.opts["verbosity"],
+-            2,
+-            "Physicality warning: negative density or pressure values!",
+-            kind="warn",
+-        )
+-
+-        return True
+-
+-    # There should be no density or pressure values above the given maxima:
+-    elif (np.max(tof.rhoi) > tof.opts["rho_max"]) or (
+-        np.max(tof.Pi) > tof.opts["P_max"]
+-    ):
+-        say(
+-            tof.opts["verbosity"],
+-            2,
+-            "Physicality warning: density or pressure values above the "
+-            "given maxima!",
+-            kind="warn",
+-        )
+-
+-        return True
+-
+-    # We passed all checks, we can return False:
+-    else:
+-        return False
+-
+-
+-def set_check_param(self, fun):
+-    """
+-    This function allows the user to set the function that checks the
+-    parameters for the barotrope or density function. The function fun should
+-    have the form fun(param) and should return True if the parameters are
+-    nonsense (i.e. out of bounds).
+-
+-    fun: Function handle for the density model.
+-    """
+-
+-    # Set function:
+-    self.check_param = fun
+-
+-
+-class _Model(NamedTuple):
+-    """
+-    What differs between the barotrope model and the density model.
+-
+-    param_init:     Option holding the starting values of the parameters.
+-    param_calc:     ToF attribute holding the current parameters.
+-    relax:          ToF method relaxing the model to hydrostatic equilibrium.
+-    max_iter:       Option limiting the iterations of that method.
+-    prepare:        Function(tof, param) run after reset(), before relaxing.
+-    """
+-
+-    param_init: str
+-    param_calc: str
+-    relax: str
+-    max_iter: str
+-    prepare: Callable
+-
+-
+-def _prepare_barotrope(self, param):
+-    # The densities follow from the barotrope while relaxing.
+-    pass
+-
+-
+-def _prepare_density(self, param):
+-    # Get densities according to self.density_function():
+-    self.rhoi = self.density_function(
+-        self.li, self.opts["M_phys"], param=param
+-    )
+-
+-
+-_BAROTROPE = _Model(
+-    "baro_param_init",
+-    "baro_param_calc",
+-    "relax_to_barotrope",
+-    "max_iter_barotrope",
+-    _prepare_barotrope,
+-)
+-
+-_DENSITY = _Model(
+-    "dens_param_init",
+-    "dens_param_calc",
+-    "relax_to_density",
+-    "max_iter_density",
+-    _prepare_density,
+-)
+-
+-
+-def _reset_and_relax(self, model, param):
+-    """
+-    Resets the ToF object, applies the model parameters and relaxes. Returns
+-    the number of iterations; raises ValueError for unphysical parameters.
+-    """
+-
+-    # Reset to initial conditions:
+-    self.reset()
+-
+-    model.prepare(self, param)
+-
+-    # Update the internal parameters:
+-    setattr(self, model.param_calc, param)
+-
+-    return getattr(self, model.relax)()
+-
+-
+-def _evaluate(self, model, param):
+-    """
+-    Relaxes the model with these parameters and returns the cost of every J,
+-    -((J - target) / sigma)^2, or None if the parameters are out of bounds or
+-    the result is unphysical or did not converge.
+-    """
+-
+-    if self.check_param(param):
+-        return None
+-
+-    try:
+-        it = _reset_and_relax(self, model, param)
+-
+-    except ValueError:
+-        return None
+-
+-    if _check_phys(self) or it == self.opts[model.max_iter]:
+-        return None
+-
+-    target = np.asarray(self.opts["target_Js"])
+-    sigma = np.asarray(self.opts["sigma_Js"])
+-
+-    return -((self.Js[1 : len(target) + 1] - target) ** 2) / sigma**2
+-
+-
+-def _cost(self, model, param, return_sum):
+-    """Shared implementation of baro_cost_function and dens_cost_function."""
+-
+-    costJs = _evaluate(self, model, param)
+-
+-    if costJs is None:
+-        if return_sum:
+-            return -np.inf
+-
+-        return [-np.inf] * len(self.opts["target_Js"])
+-
+-    if return_sum:
+-        return np.sum(costJs)
+-
+-    else:
+-        return costJs
+-
+-
+-def baro_cost_function(self, param, return_sum=True):
+-    """
+-    Calls relax_to_barotrope() and returns values specifying how far off the
+-    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
+-
+-    param: Array of parameters for the barotrope function.
+-    return_sum: If True, returns the sum of the costs for all Js. If False,
+-                returns an array of costs for each J separately.
+-    """
+-
+-    return _cost(self, _BAROTROPE, param, return_sum)
+-
+-
+-def dens_cost_function(self, param, return_sum=True):
+-    """
+-    Calls relax_to_barotrope() and returns values specifying how far off the
+-    calculated Js are from opts['target_Js'] given opts['sigma_Js'].
+-
+-    param: Array of parameters for the density function.
+-    return_sum: If True, returns the sum of the costs for all Js. If False,
+-                returns an array of costs for each J separately.
+-    """
+-
+-    return _cost(self, _DENSITY, param, return_sum)
+-
+-
+-def _log_prob(self, model, param):
+-    """
+-    What emcee samples: the log probability (the summed cost) and, as a blob,
+-    the worst deviation of any J from its target in sigma (inf if the model
+-    is out of bounds or unphysical). A model fits if the blob is small.
+-    """
+-
+-    costJs = _evaluate(self, model, param)
+-
+-    if costJs is None:
+-        return -np.inf, np.inf
+-
+-    return np.sum(costJs), float(np.sqrt(np.max(-costJs)))
+-
+-
+-def baro_log_prob(param, tof):
+-    """
+-    Changes order of arguments for the emcee algorithm.
+-    """
+-
+-    return _log_prob(tof, _BAROTROPE, param)
+-
+-
+-def dens_log_prob(param, tof):
+-    """
+-    Changes order of arguments for the emcee algorithm.
+-    """
+-
+-    return _log_prob(tof, _DENSITY, param)
+-
+-
+-def _initial_parameters(self, model, nwalkers, max_attempts):
+-    """
+-    Draws random starting parameters (as fractions of the initial values)
+-    until nwalkers of them are accepted by check_param() and yield a physical
+-    solution. Gives up with an error after max_attempts draws for one walker.
+-    """
+-
+-    initial = self.opts[model.param_init]
+-    param_0 = np.zeros((nwalkers, len(initial)))
+-    rejected = dict(out_of_bounds=0, unphysical=0)
+-
+-    for i in range(nwalkers):
+-        for _ in range(max_attempts):
+-            candidate = np.random.rand(1, len(initial)) * initial
+-
+-            if self.check_param(candidate[0]):
+-                rejected["out_of_bounds"] += 1
+-                continue
+-
+-            try:
+-                it = _reset_and_relax(self, model, candidate[0])
+-
+-            except ValueError:
+-                rejected["unphysical"] += 1
+-                continue
+-
+-            # Only proceed if the candidate also yields a physical solution:
+-            if _check_phys(self) or it >= self.opts[model.max_iter]:
+-                rejected["unphysical"] += 1
+-                continue
+-
+-            param_0[i, :] = candidate[0]
+-            say(
+-                self.opts["verbosity"],
+-                1,
+-                "Generated initial conditions for walker number: {i}",
+-                i=i,
+-            )
+-            break
+-
+-        else:
+-            raise RuntimeError(
+-                f"No physical starting point found for walker {i} in "
+-                f"{max_attempts} attempts ({rejected['out_of_bounds']} draws "
+-                f"rejected by check_param, {rejected['unphysical']} gave "
+-                "unphysical or unconverged models). Starting values are "
+-                f"drawn uniformly between 0 and {model.param_init}: check "
+-                "that range and your barotrope/density function, or raise "
+-                "max_start_attempts."
+-            )
+-
+-    return param_0
+-
+-
+-def _write_profile(self, path_stem, log_CGS_units, index):
+-    """
+-    Writes radii, densities and pressures of the current model to
+-    <path_stem>_SI_<index>.txt, or <path_stem>_CGS_<index>.txt with radii in
+-    cm and log10 of the density in g/cm^3 and of the pressure in bar.
+-    """
+-
+-    if log_CGS_units:
+-        columns = [
+-            self.li * 100,
+-            np.log10(self.rhoi) - 3,
+-            np.log10(self.Pi) + 1,
+-        ]
+-        unit = "CGS"
+-
+-    else:
+-        columns = [self.li, self.rhoi, self.Pi]
+-        unit = "SI"
+-
+-    np.savetxt(f"{path_stem}_{unit}_{index}.txt", np.transpose(columns))
+-
+-
+-def _save_fit(self, model, settings, job):
+-    """
+-    Re-evaluates one sample of the chain and writes the model to disk if it
+-    still fits. Returns its worst deviation in sigma, or None if not saved.
+-    """
+-
+-    param, index = job
+-    costJs = _evaluate(self, model, param)
+-
+-    if costJs is None:
+-        return None
+-
+-    worst = float(np.sqrt(np.max(-costJs)))
+-    if worst >= settings.n_sigma:
+-        return None
+-
+-    stem = os.path.join(settings.directory, settings.file_name)
+-    _write_profile(self, stem, settings.log_CGS_units, index)
+-
+-    return worst
+-
+-
+-def _make_pool(self, Ncores):
+-    """A process pool; explains the usual reason why one cannot be made."""
+-
+-    try:
+-        pickle.dumps(self)
+-
+-    except (pickle.PicklingError, AttributeError, TypeError) as error:
+-        raise TypeError(
+-            "parallelize=True sends the ToF object to other processes, but "
+-            "something it holds cannot be pickled, most likely a barotrope, "
+-            "density, atmosphere or check_param function defined inside "
+-            "another function (or a lambda). Define them at the top level "
+-            "of a module or notebook cell, or use parallelize=False. "
+-            f"({error})"
+-        ) from error
+-
+-    methods = multiprocessing.get_all_start_methods()
+-    context = multiprocessing.get_context(
+-        "fork" if "fork" in methods else None
+-    )
+-
+-    return context.Pool(processes=Ncores)
+-
+-
+-def run_mcmc(
+-    self,
+-    what_model,
+-    nwalkers,
+-    steps,
+-    Ncores=8,
+-    parallelize=False,
+-    *,
+-    convergence=None,
+-    save_fits=None,
+-    checkpoint=None,
+-    seed=None,
+-    max_start_attempts=1000,
+-):
+-    """
+-    Explores the parameters of the barotrope (what_model="baro") or the
+-    density function (what_model="dens") with the emcee algorithm: nwalkers
+-    walkers take up to `steps` steps, constrained by check_phys() and
+-    check_param(). Returns an MCMCResult.
+-
+-    The chain is examined every convergence.check_every steps and stops early
+-    once it has converged, see ConvergenceCriteria.
+-
+-    convergence     ConvergenceCriteria, or None for the defaults.
+-    save_fits       SaveFits: while the chain runs, write the models that fit
+-                    the data and differ enough from each other to disk, so
+-                    that a run that does not converge still delivers models.
+-    checkpoint      Path of an HDF5 file (needs h5py) the chain is written to
+-                    after every step. If the file holds a chain of this shape
+-                    the run continues it (up to `steps` in total).
+-    seed            Seeds NumPy's random numbers for reproducible runs.
+-    max_start_attempts
+-                    Random draws allowed per walker when looking for a
+-                    physical starting point before giving up.
+-    """
+-
+-    models = dict(
+-        baro=(_BAROTROPE, baro_log_prob), dens=(_DENSITY, dens_log_prob)
+-    )
+-    if what_model not in models:
+-        raise KeyError("Invalid keyword for what_model! Use 'baro' or 'dens'.")
+-    model, log_prob = models[what_model]
+-
+-    if self.opts[model.param_init] is None:
+-        raise ValueError(
+-            f"The option {model.param_init} (the starting values of the "
+-            "parameters) has to be set."
+-        )
+-    if getattr(self, "check_param", None) is None:
+-        raise ValueError("Call set_check_param() first.")
+-
+-    ndim = len(self.opts[model.param_init])
+-    if nwalkers < 2 * ndim:
+-        raise ValueError(
+-            f"emcee needs at least twice as many walkers as parameters: "
+-            f"nwalkers >= {2 * ndim} for {ndim} parameters, not {nwalkers}."
+-        )
+-    if steps < 1:
+-        raise ValueError("steps must be at least 1.")
+-
+-    criteria = (
+-        convergence if convergence is not None else ConvergenceCriteria()
+-    )
+-    verbosity = self.opts["verbosity"]
+-
+-    if seed is not None:
+-        np.random.seed(seed)
+-
+-    backend, resumed = open_checkpoint(checkpoint, nwalkers, ndim, verbosity)
+-    if resumed:
+-        param_0 = np.empty((nwalkers, ndim))  # the chain on disk is used
+-    else:
+-        param_0 = _initial_parameters(
+-            self, model, nwalkers, max_start_attempts
+-        )
+-
+-        # Average cost of the starting positions:
+-        average = sum(_cost(self, model, p, True) for p in param_0) / nwalkers
+-        say(
+-            verbosity,
+-            1,
+-            "Average cost of a walker with the generated initial "
+-            "parameters: {average:.2e}",
+-            average=average,
+-        )
+-
+-    saver = FitSaver(save_fits, ndim) if save_fits is not None else None
+-    save_model = (
+-        functools.partial(_save_fit, self, model, save_fits)
+-        if save_fits is not None
+-        else None
+-    )
+-
+-    pool = _make_pool(self, Ncores) if parallelize else None
+-    try:
+-        callback = None
+-        if saver is not None:
+-
+-            def callback(sampler, diagnostics):
+-                return saver.update(
+-                    sampler, diagnostics, save_model, pool, verbosity
+-                )
+-
+-        sampler, diagnostics, history, autocorr, stopped_early = run_sampler(
+-            log_prob,
+-            [self],
+-            param_0,
+-            steps,
+-            criteria,
+-            pool=pool,
+-            backend=backend,
+-            resumed=resumed,
+-            callback=callback,
+-            verbosity=verbosity,
+-        )
+-
+-    finally:
+-        if pool is not None:
+-            pool.close()
+-            pool.join()
+-
+-    failed = [name for name, ok in diagnostics["checks"].items() if not ok]
+-    say(
+-        verbosity,
+-        1,
+-        "Average cost of a walker after the Markov Chain Monte Carlo walk: "
+-        "{average:.2e}. The chain {status}.",
+-        average=np.mean(sampler.get_last_sample().log_prob),
+-        status="converged"
+-        if diagnostics["converged"]
+-        else "did not converge (not yet: " + ", ".join(failed) + ")",
+-    )
+-
+-    return MCMCResult(
+-        state=sampler.get_last_sample().coords,
+-        autocorr=autocorr,
+-        converged=diagnostics["converged"],
+-        failed_checks=failed,
+-        diagnostics=diagnostics,
+-        history=history,
+-        chain=sampler.get_chain(),
+-        log_prob=sampler.get_log_prob(),
+-        blobs=sampler.get_blobs(),
+-        n_fits_saved=saver.n_saved if saver is not None else 0,
+-        stopped_early=stopped_early,
+-        save_directory=save_fits.directory if save_fits is not None else None,
+-    )
+-
+-
+-def run_baro_MC(self, nwalkers, steps, Ncores=8, parallelize=False, **kwargs):
+-    """
+-    Uses the emcee algorithm for the given amount of steps and creates nwalkers
+-    many parameter candidates (i.e. walkers) that will explore the allowed
+-    parameter space (constrained by check_phys() and check_param()).
+-
+-    Returns the final positions of the walkers and the autocorrelation times;
+-    see run_mcmc() for the options and for a richer result.
+-    """
+-
+-    result = run_mcmc(
+-        self, "baro", nwalkers, steps, Ncores, parallelize, **kwargs
+-    )
+-
+-    return result.state, result.autocorr
+-
+-
+-def run_dens_MC(self, nwalkers, steps, Ncores=8, parallelize=False, **kwargs):
+-    """
+-    Uses the emcee algorithm for the given amount of steps and creates nwalkers
+-    many parameter candidates (i.e. walkers) that will explore the allowed
+-    parameter space (constrained by check_phys() and check_param()).
+-
+-    Returns the final positions of the walkers and the autocorrelation times;
+-    see run_mcmc() for the options and for a richer result.
+-    """
+-
+-    result = run_mcmc(
+-        self, "dens", nwalkers, steps, Ncores, parallelize, **kwargs
+-    )
+-
+-    return result.state, result.autocorr
+-
+-
+-def classify_and_save_state(
+-    self,
+-    state,
+-    what_model,
+-    what_save="none",
+-    log_CGS_units=False,
+-    path_name=None,
+-    file_name="walker",
+-):
+-    """
+-    Classifies the nwalkers many parameter candidates according to their
+-    physicality, i.e. by checking if they agree with the physical data within 1
+-    sigma. Also allows for saving .txt files with the radii, densities and
+-    pressures within the planet generated by the walker parameters.
+-    """
+-
+-    if path_name is None:
+-        path_name = os.getcwd()
+-
+-    # Storage arrays:
+-    matches_observed_Js = []
+-    rho_maxs = []
+-
+-    # Loop through walkers:
+-    for i in range(len(state[:, 0])):
+-        # Calculate the physical cost:
+-        if what_model == "baro":
+-            costJs = baro_cost_function(self, state[i, :], return_sum=False)
+-
+-        elif what_model == "dens":
+-            costJs = dens_cost_function(self, state[i, :], return_sum=False)
+-
+-        else:
+-            raise KeyError(
+-                "Invalid keyword for what_model! Use 'baro' or 'dens'."
+-            )
+-
+-        # Check if there is agreement with physical data within 1 sigma:
+-        if (np.abs(costJs) < 1e0).all():
+-            kind = "good"
+-            matches_observed_Js.append(True)
+-
+-        else:
+-            kind = "warn"
+-            matches_observed_Js.append(False)
+-
+-        # Save .txt file if wanted by the user:
+-        stem = path_name + "/" + file_name
+-        unit = "CGS" if log_CGS_units else "SI"
+-        exists = os.path.exists(f"{stem}_{unit}_{i}.txt")
+-
+-        if what_save == "all":
+-            if not exists:
+-                _write_profile(self, stem, log_CGS_units, i)
+-
+-        elif what_save == "good" and (np.abs(costJs) < 1e0).all():
+-            _write_profile(self, stem, log_CGS_units, i)
+-
+-        elif what_save not in ("good", "none"):
+-            raise KeyError(
+-                "Invalid keyword for what_save! Use 'all' or 'good' or 'none'."
+-            )
+-
+-        # Update storage arrays:
+-        rho_maxs.append(np.max(self.rhoi))
+-
+-        # Verbosity output:
+-        verbosity = self.opts["verbosity"]
+-        if verbosity > 0:
+-            header = " " * 9
+-            mine = ""
+-            target = ""
+-
+-            for j, cost_j in enumerate(costJs):
+-                label = f"     J{2 * (j + 1)}     "
+-                header += paint(label, "good" if abs(cost_j) < 1e0 else "warn")
+-                mine += f"{self.Js[j + 1]:.5e} "
+-                target += f"{self.opts['target_Js'][j]:.5e} "
+-
+-            say(
+-                verbosity,
+-                1,
+-                "\nWalker #{i} yields a total cost of {total_cost:.2e}.",
+-                kind=kind,
+-                i=i,
+-                total_cost=np.sum(costJs),
+-            )
+-            print(header)
+-            say(verbosity, 1, "My code: {values}", values=mine)
+-            say(verbosity, 1, "Target:  {values}\n", values=target)
+-
+-    return np.array(matches_observed_Js), np.array(rho_maxs)
+diff --git a/PyToF/PlotToF.py b/PyToF/PlotToF.py
+index 370ca4d..ca25cec 100644
+--- a/PyToF/PlotToF.py
++++ b/PyToF/PlotToF.py
+@@ -2,13 +2,11 @@
+ # Author of this version: Luca Morf - luca.morf@uzh.ch #
+ ########################################################
+ 
+-import math
+ import os
+ 
+ import matplotlib
+ import matplotlib.pyplot as plt
+ import numpy as np
+-import scipy
+ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+ 
+ 
+@@ -171,31 +169,6 @@ def _default_plot_ss():
+     return opts
+ 
+ 
+-def _default_plot_autocorr():
+-    """
+-    Return default keyword arguments for plot_autocorr().
+-
+-    The defaults determine legend configuration and save parameters for
+-    plotting integrated autocorrelation results.
+-    """
+-
+-    opts = {}
+-
+-    opts["do_legend"] = False
+-    opts["loc_legend"] = "best"
+-    opts["ncol_legend"] = 1
+-    opts["frameon_legend"] = True
+-    opts["bbox_to_anchor_legend"] = (0.0, 0.0, 1.0, 1.0)
+-
+-    opts["do_save"] = False
+-    opts["path_name"] = os.getcwd()
+-    opts["fig_name"] = "figure"
+-    opts["format"] = "png"
+-    opts["transparent"] = False
+-
+-    return opts
+-
+-
+ def plot_xy(
+     self,
+     x,
+@@ -672,579 +645,3 @@ def plot_ss(self, **kwargs):
+             format=opts["format"],
+             transparent=opts["transparent"],
+         )
+-
+-
+-def plot_state_xy(
+-    self,
+-    x,
+-    y,
+-    state,
+-    what_model,
+-    literature=None,
+-    inset_plot_xy=None,
+-    colorbar=None,
+-    **kwargs,
+-):
+-    """
+-    Plot selected properties of several models
+-    (for example radius vs. density).
+-
+-    Parameters
+-    ----------
+-    self:      PyToF object, does not need to be provided by the user,
+-                    see ClassToF.py.
+-    x, y:           Integer indices selecting which quantities to plot along x
+-                    and y axes.
+-    state:          2D array of model states
+-                    (rows = realizations, columns = parameters).
+-    what_model:     {'baro', 'dens'}, specifies whether to use barotropic or
+-                    density cost function.
+-    literature:     object, reference data object with attributes lis, rhois,
+-                    Pis, etc.
+-    inset_plot_xy:  object, definition of an inset subplot with limits and
+-                    axes configuration.
+-    colorbar:       object, defining a Matplotlib colorbar, with attributes
+-                    such as mappable, label, width, stretch, etc.
+-    **kwargs:       Additional keyword arguments to override default plot
+-                    settings.
+-    """
+-
+-    # Apply default and user supplied options:
+-    mpl_opts = {**_default_mpl_opts(), **kwargs}
+-    _apply_mpl_opts(mpl_opts)
+-    opts = {**_default_plot_xy_opts(), **kwargs}
+-
+-    # Add a colorbar if needed and set colors to use:
+-    if colorbar is not None:
+-        idxs = np.argsort(colorbar.sort_by)
+-        colors = colorbar.cmap(
+-            (colorbar.sort_by - min(colorbar.sort_by))
+-            / (max(colorbar.sort_by) - min(colorbar.sort_by))
+-        )[idxs]
+-
+-    else:
+-        idxs = range(len(state[:, 0]))
+-        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"] * (
+-            len(idxs) // 10 + 1
+-        )
+-
+-    # Initialize iteration:
+-    j = 0
+-    do_save = opts["do_save"]
+-    do_legend = opts["do_legend"]
+-
+-    # Do the iteration:
+-    for i in idxs:
+-        # Call cost functions depending on what model was used:
+-        if what_model == "baro":
+-            costJs = self.baro_cost_function(state[i, :], return_sum=False)
+-
+-        elif what_model == "dens":
+-            costJs = self.dens_cost_function(state[i, :], return_sum=False)
+-
+-        else:
+-            raise KeyError(
+-                "Invalid keyword for what_model! Use 'baro' or 'dens'."
+-            )
+-
+-        # Check for data consistency according to cost function results:
+-        if (np.abs(costJs) < 1e0).all():
+-            color = colors[j]
+-            opts["zorder"] = j
+-            j += 1
+-
+-        else:
+-            color = (0.8, 0.8, 0.8, 0.3)
+-            opts["zorder"] = 0
+-
+-            if colorbar is not None:
+-                j += 1
+-
+-        # Prepare arguments for plot_xy():
+-        if i == idxs[0] and len(idxs) == 1:
+-            opts["color"] = color
+-            opts["do_save"] = do_save
+-            do_new_figure_arg = True
+-            literature_arg = literature
+-            opts["do_legend"] = do_legend
+-
+-        elif i == idxs[0]:
+-            opts["color"] = color
+-            opts["do_save"] = False
+-            do_new_figure_arg = True
+-            literature_arg = None
+-            opts["do_legend"] = False
+-
+-        elif i != idxs[-1]:
+-            opts["color"] = color
+-            opts["do_save"] = False
+-            do_new_figure_arg = False
+-            literature_arg = None
+-            opts["do_legend"] = False
+-
+-        else:
+-            opts["color"] = color
+-            opts["do_save"] = do_save
+-            do_new_figure_arg = False
+-            literature_arg = literature
+-            opts["do_legend"] = do_legend
+-
+-        # Call plot_xy():
+-        plot_xy(
+-            self,
+-            x,
+-            y,
+-            do_new_figure=do_new_figure_arg,
+-            literature=literature_arg,
+-            inset_plot_xy=inset_plot_xy,
+-            colorbar=colorbar,
+-            **opts,
+-        )
+-
+-
+-def plot_state_corr_xy(
+-    self,
+-    x,
+-    y,
+-    state,
+-    what_model,
+-    sigma_lim=np.inf,
+-    literature=None,
+-    colorbar=None,
+-    **kwargs,
+-):
+-    """
+-    Plot correlations between two model quantities with marginal histograms.
+-
+-    Displays a scatter plot of two quantities (specified by x, y) with
+-    associated error bars, marginal histograms, and Spearman correlation
+-    coefficients.
+-
+-    Parameters
+-    ----------
+-    self:      PyToF object, does not need to be provided by the user,
+-                    see ClassToF.py.
+-    x, y:           Integer indices selecting which quantities to plot along x
+-                    and y axes.
+-    state:          2D array of model states
+-                    (rows = realizations, columns = parameters).
+-    what_model:     {'baro', 'dens'}, specifies whether to use barotropic or
+-                    density cost function.
+-    sigma_lim:      float, number of standard deviations to limit
+-                    plotted data points, by default np.inf (no limit).
+-    literature:     object, reference data object with attributes lis, rhois,
+-                    Pis, etc.
+-    colorbar:       object, defining a Matplotlib colorbar, with attributes
+-                    such as mappable, label, width, stretch, etc.
+-    **kwargs:       Additional keyword arguments to override default plot
+-                    settings.
+-    """
+-
+-    # Apply default and user supplied options:
+-    mpl_opts = {
+-        **_default_mpl_opts(),
+-        "axes.xmargin": 0.05,
+-        "axes.ymargin": 0.05,
+-        **kwargs,
+-    }
+-    _apply_mpl_opts(mpl_opts)
+-    opts = {**_default_plot_xy_opts(), **kwargs}
+-
+-    # Define storage lists:
+-    Js_list = []
+-    Js_err_list = []
+-    color_list = []
+-    match_list = []
+-
+-    # Add a colorbar if needed and set colors to use:
+-    if colorbar is not None:
+-        idxs = np.argsort(colorbar.sort_by)
+-        colors = colorbar.cmap(
+-            (colorbar.sort_by - min(colorbar.sort_by))
+-            / (max(colorbar.sort_by) - min(colorbar.sort_by))
+-        )[idxs]
+-
+-    else:
+-        idxs = range(len(state[:, 0]))
+-        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"] * (
+-            len(idxs) // 10 + 1
+-        )
+-
+-    # Initialize iteration:
+-    j = 0
+-
+-    # Do the iteration:
+-    for i in idxs:
+-        # Call cost functions depending on what model was used:
+-        if what_model == "baro":
+-            costJs = self.baro_cost_function(state[i, :], return_sum=False)
+-
+-        elif what_model == "dens":
+-            costJs = self.dens_cost_function(state[i, :], return_sum=False)
+-
+-        else:
+-            raise KeyError(
+-                "Invalid keyword for what_model! Use 'baro' or 'dens'."
+-            )
+-
+-        # Check for data consistency according to cost function results:
+-        if (np.abs(costJs) < 1e0).all():
+-            match_list.append(True)
+-
+-            color = colors[j]
+-            opts["zorder"] = j
+-            j += 1
+-
+-        else:
+-            match_list.append(False)
+-
+-            color = (0.8, 0.8, 0.8, 0.3)
+-            opts["zorder"] = 0
+-
+-            if colorbar is not None:
+-                j += 1
+-
+-        # Save results:
+-        Js_list.append(self.Js)
+-        Js_err_list.append(self.Js_errors)
+-        color_list.append(color)
+-
+-    # Convert storage lists to arrays:
+-    Js_list = np.array(Js_list)
+-    Js_err_list = np.array(Js_err_list)
+-
+-    # Create new figure:
+-    fig = plt.figure(
+-        figsize=(mpl_opts["figure.figsize"][0], mpl_opts["figure.figsize"][0]),
+-        layout="constrained",
+-    )
+-    gs = fig.add_gridspec(
+-        2,
+-        3,
+-        width_ratios=(4, 1.25, 0.01),
+-        height_ratios=(1.25, 4),
+-        wspace=0.00,
+-        hspace=0.00,
+-    )
+-
+-    # Define axes:
+-    ax = fig.add_subplot(gs[1, 0])
+-    ax_leg = fig.add_subplot(gs[0, 1])
+-    ax_histx = fig.add_subplot(gs[0, 0], sharex=ax)
+-    ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
+-
+-    # Set custom axes options:
+-    ax_leg.set_xticks([])
+-    ax_leg.set_yticks([])
+-    ax_histx.tick_params(
+-        axis="both",
+-        which="both",
+-        bottom=False,
+-        top=False,
+-        left=True,
+-        right=False,
+-        labelbottom=False,
+-        labelleft=True,
+-    )
+-    ax_histy.tick_params(
+-        axis="both",
+-        which="both",
+-        bottom=True,
+-        top=False,
+-        left=False,
+-        right=False,
+-        labelbottom=True,
+-        labelleft=False,
+-    )
+-
+-    for spine in ["top", "right"]:
+-        ax_histx.spines[spine].set_visible(False)
+-        ax_histy.spines[spine].set_visible(False)
+-
+-    for spine in ax_leg.spines.values():
+-        spine.set_visible(False)
+-
+-    # Define data to be plotted along the x dimension according to user input:
+-    if x >= len(Js_list[0, :]):
+-        x_label = r"$b_{" + str(x - len(Js_list[0, :])) + r"}$"
+-        x_array = state[:, x - len(Js_list[0, :])]
+-        x_err = np.zeros_like(x_array)
+-
+-    else:
+-        x_label = r"$J_{" + str(2 * x) + r"}$"
+-        x_array = Js_list[:, x]
+-        x_err = Js_err_list[:, x]
+-
+-    # Define data to be plotted along the y dimension according to user input:
+-    if y >= len(Js_list[0, :]):
+-        y_label = r"$b_{" + str(y - len(Js_list[0, :])) + r"}$"
+-        y_array = state[:, y - len(Js_list[0, :])]
+-        y_err = np.zeros_like(y_array)
+-
+-    else:
+-        y_label = r"$J_{" + str(2 * y) + r"}$"
+-        y_array = Js_list[:, y]
+-        y_err = Js_err_list[:, y]
+-
+-    # Find order of magnitude for the data to be plotted:
+-    if np.any(abs(x_array)):
+-        x_scale = math.floor(math.log(np.max(abs(x_array)), 10)) + 1
+-
+-    else:
+-        x_scale = 0
+-
+-    if np.any(abs(y_array)):
+-        y_scale = math.floor(math.log(np.max(abs(y_array)), 10)) + 1
+-
+-    else:
+-        y_scale = 0
+-
+-    # Normalise the data to be plotted:
+-    x_array /= 10**x_scale
+-    y_array /= 10**y_scale
+-    x_err /= 10**x_scale
+-    y_err /= 10**y_scale
+-
+-    # Define and set x and y labels:
+-    x_label = r" $10^{" + str(-x_scale) + "}$" + x_label
+-    y_label = r" $10^{" + str(-y_scale) + "}$" + y_label
+-    ax.set_xlabel(x_label)
+-    ax.set_ylabel(y_label)
+-
+-    # Apply the sigma_lim potentially supplied by the user, sigma_lim=np.inf
+-    # has no effect:
+-    mask_x = (x_array - np.average(x_array)) ** 2 / max(
+-        np.std(x_array) ** 2, np.spacing(np.average(x_array))
+-    ) <= sigma_lim**2
+-    mask_y = (y_array - np.average(y_array)) ** 2 / max(
+-        np.std(y_array) ** 2, np.spacing(np.average(y_array))
+-    ) <= sigma_lim**2
+-    mask = np.logical_and(mask_x, mask_y)
+-
+-    x_array = x_array[mask]
+-    y_array = y_array[mask]
+-    x_err = x_err[mask]
+-    y_err = y_err[mask]
+-    color_list = [
+-        color for color, m in zip(color_list, mask, strict=True) if m
+-    ]
+-
+-    # Plot the data:
+-    for xa, ya, xe, ye, color, match in zip(
+-        x_array, y_array, x_err, y_err, color_list, match_list, strict=True
+-    ):
+-        if not match:
+-            xe = np.nan
+-            ye = np.nan
+-        ax.errorbar(xa, ya, xerr=xe, yerr=ye, color=color, fmt="o")
+-
+-    # Plot the x-data histogram:
+-    bins_x = np.linspace(x_array.min(), x_array.max(), 15)
+-    ax_histx.hist(x_array, bins=bins_x, alpha=0.5, color="black")
+-    counts, bin_edges = np.histogram(x_array, bins=bins_x)
+-    x_outline_x = np.repeat(bin_edges, 2)
+-    y_outline_x = np.hstack(([0], np.repeat(counts, 2), [0]))
+-    ax_histx.plot(x_outline_x, y_outline_x, color="black")
+-
+-    # Plot the y-data histogram:
+-    bins_y = np.linspace(y_array.min(), y_array.max(), 15)
+-    ax_histy.hist(
+-        y_array,
+-        bins=bins_y,
+-        alpha=0.5,
+-        orientation="horizontal",
+-        color="black",
+-    )
+-    counts, bin_edges = np.histogram(y_array, bins=bins_y)
+-    y_outline_y = np.repeat(bin_edges, 2)
+-    x_outline_y = np.hstack(([0], np.repeat(counts, 2), [0]))
+-    ax_histy.plot(x_outline_y, y_outline_y, color="black")
+-
+-    # Denote spearman correlation coefficient with confidence interval value:
+-    (p1,) = ax.plot(np.nan, np.nan)
+-    (p2,) = ax.plot(np.nan, np.nan)
+-    ax_leg.legend(
+-        [p1, p2],
+-        [
+-            r"$\rho=${:.2f}".format(
+-                scipy.stats.spearmanr(x_array, y_array, nan_policy="omit")[0]
+-            ),
+-            r"$p=${:.2f}".format(
+-                scipy.stats.spearmanr(x_array, y_array, nan_policy="omit")[1]
+-            ),
+-        ],
+-        handletextpad=0,
+-        handlelength=0,
+-        loc="center",
+-        ncol=1,
+-        frameon=False,
+-        bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
+-    )
+-
+-    # Plot target gravitational moments:
+-    if (x < len(Js_list[0, :])) and (y < len(Js_list[0, :])):
+-        ax.errorbar(
+-            self.opts["target_Js"][x - 1] / 10**x_scale,
+-            self.opts["target_Js"][y - 1] / 10**y_scale,
+-            xerr=self.opts["sigma_Js"][x - 1] / 10**x_scale,
+-            yerr=self.opts["sigma_Js"][y - 1] / 10**y_scale,
+-            color="k",
+-            fmt="o",
+-            capsize=3.0,
+-            capthick=3.0,
+-        )
+-
+-    # Add a colorbar if needed:
+-    if colorbar is not None:
+-        cax = fig.add_subplot(gs[1, 2])
+-        gs.set_width_ratios([4, 1.25, colorbar.width])
+-        fig.set_size_inches(
+-            mpl_opts["figure.figsize"][0] * colorbar.stretch,
+-            mpl_opts["figure.figsize"][0],
+-            forward=True,
+-        )
+-
+-        cbar = fig.colorbar(colorbar.mappable, cax=cax, orientation="vertical")
+-        cbar.set_label(colorbar.label)
+-        cbar.ax.tick_params(
+-            which="major",
+-            direction="out",
+-            right=True,
+-            left=False,
+-            width=mpl_opts["ytick.major.width"],
+-            length=mpl_opts["ytick.major.size"],
+-        )
+-
+-        if hasattr(colorbar, "tick_lab"):
+-            cbar.set_ticks(colorbar.tick_pos)
+-            cbar.set_ticklabels(colorbar.tick_lab)
+-
+-        if hasattr(colorbar, "tick_show"):
+-            if not colorbar.tick_show:
+-                cbar.ax.tick_params(left=False, right=False)
+-
+-        cbar.ax.tick_params(
+-            which="minor",
+-            direction="out",
+-            right=True,
+-            left=False,
+-            width=mpl_opts["ytick.minor.width"],
+-            length=mpl_opts["ytick.minor.size"],
+-        )
+-
+-    # Ensure that the scatter plot focuses on the data points:
+-    ax.set_xlim(
+-        (
+-            np.min(x_array)
+-            - mpl_opts["axes.xmargin"] * (np.max(x_array) - np.min(x_array)),
+-            np.max(x_array)
+-            + mpl_opts["axes.xmargin"] * (np.max(x_array) - np.min(x_array)),
+-        )
+-    )
+-    ax.set_ylim(
+-        (
+-            np.min(y_array)
+-            - mpl_opts["axes.ymargin"] * (np.max(y_array) - np.min(y_array)),
+-            np.max(y_array)
+-            + mpl_opts["axes.ymargin"] * (np.max(y_array) - np.min(y_array)),
+-        )
+-    )
+-
+-    # Do the legend if needed:
+-    if opts["do_legend"]:
+-        ax_histx.legend(
+-            [p1, p2],
+-            [
+-                rf"$\mu=${np.average(x_array):.3f}",
+-                rf"$\sigma=${np.std(x_array):.0e}",
+-            ],
+-            handletextpad=0,
+-            handlelength=0,
+-            loc=opts["loc_legend"],
+-            ncol=opts["ncol_legend"],
+-            frameon=opts["frameon_legend"],
+-            bbox_to_anchor=opts["bbox_to_anchor_legend"],
+-        )
+-
+-        ax_histy.legend(
+-            [p1, p2],
+-            [
+-                rf"$\mu=${np.average(y_array):.3f}",
+-                rf"$\sigma=${np.std(y_array):.0e}",
+-            ],
+-            handletextpad=0,
+-            handlelength=0,
+-            loc=opts["loc_legend"],
+-            ncol=opts["ncol_legend"],
+-            frameon=opts["frameon_legend"],
+-            bbox_to_anchor=opts["bbox_to_anchor_legend"],
+-        )
+-
+-    # Save the plot if needed:
+-    if opts["do_save"]:
+-        fig.savefig(
+-            opts["path_name"] + "/" + opts["fig_name"] + "." + opts["format"],
+-            format=opts["format"],
+-            transparent=opts["transparent"],
+-        )
+-
+-
+-def plot_autocorr(autocorr, **kwargs):
+-    """
+-    Plot integrated autocorrelation time versus sampling length.
+-
+-    Parameters
+-    ----------
+-    autocorr:   Array of estimated autocorrelation times for increasing step
+-                numbers.
+-    **kwargs:   Additional keyword arguments to override default plot settings.
+-    """
+-
+-    # Apply default and user supplied options:
+-    mpl_opts = {
+-        **_default_mpl_opts(),
+-        "axes.xmargin": 0.05,
+-        "axes.ymargin": 0.05,
+-        **kwargs,
+-    }
+-    _apply_mpl_opts(mpl_opts)
+-    opts = {**_default_plot_autocorr(), **kwargs}
+-
+-    # Create new figure:
+-    fig, ax = plt.subplots(layout="constrained")
+-
+-    # Plot the data:
+-    ax.plot(
+-        100 * np.arange(1, len(autocorr) + 1),
+-        np.arange(1, len(autocorr) + 1),
+-        "--",
+-        label=r"$\tau=N/100$",
+-        color="black",
+-    )
+-    ax.plot(
+-        100 * np.arange(1, len(autocorr) + 1),
+-        autocorr,
+-        "o-",
+-        label=r"estimated $\tau$",
+-    )
+-
+-    # Set labels for x- and y-axes:
+-    ax.set_xlabel(r"number of steps $N$")
+-    ax.set_ylabel(r"integrated autocorrelation time")
+-
+-    # Do the legend if needed:
+-    if opts["do_legend"]:
+-        ax.legend(
+-            loc=opts["loc_legend"],
+-            ncol=opts["ncol_legend"],
+-            frameon=opts["frameon_legend"],
+-            bbox_to_anchor=opts["bbox_to_anchor_legend"],
+-        )
+-
+-    # Save the plot if needed:
+-    if opts["do_save"]:
+-        fig.savefig(
+-            opts["path_name"] + "/" + opts["fig_name"] + "." + opts["format"],
+-            format=opts["format"],
+-            transparent=opts["transparent"],
+-        )
+diff --git a/PyToF/__init__.py b/PyToF/__init__.py
+index e957a71..cc17cff 100644
+--- a/PyToF/__init__.py
++++ b/PyToF/__init__.py
+@@ -5,9 +5,6 @@
+ from importlib.metadata import PackageNotFoundError, version
+ 
+ from PyToF.ClassToF import ToF as ToF
+-from PyToF.sampling import ConvergenceCriteria as ConvergenceCriteria
+-from PyToF.sampling import MCMCResult as MCMCResult
+-from PyToF.sampling import SaveFits as SaveFits
+ 
+ try:
+     __version__ = version("PyToF")
+diff --git a/PyToF/options.py b/PyToF/options.py
+index 408a155..a48ee5f 100644
+--- a/PyToF/options.py
++++ b/PyToF/options.py
+@@ -49,10 +49,6 @@ RENAMED = {
+     "MaxIterUpdate": "max_iter_update",
+     "MaxIterBar": "max_iter_barotrope",
+     "MaxIterDen": "max_iter_density",
+-    "Target_Js": "target_Js",
+-    "Sigma_Js": "sigma_Js",
+-    "rho_MAX": "rho_max",
+-    "P_MAX": "P_max",
+ }
+ 
+ RADIUS_KINDS = ("equatorial", "mean", "polar")
+@@ -149,19 +145,6 @@ class Options:
+         "planet",
+     )
+     P0: float = _option(0, "Surface pressure in SI units.", "planet")
+-    target_Js: np.ndarray = _option(
+-        lambda: np.array(_JS),
+-        "Observed gravitational moments J2, J4, ... used by the cost "
+-        "function.",
+-        "planet",
+-        factory=True,
+-    )
+-    sigma_Js: np.ndarray = _option(
+-        lambda: np.array([np.spacing(j) for j in _JS]),
+-        "1-sigma uncertainties of target_Js.",
+-        "planet",
+-        factory=True,
+-    )
+     alphas: np.ndarray = _option(
+         lambda: np.zeros(12),
+         "Barotropic differential rotation parameters in m^2 s^-2 "
+@@ -170,22 +153,11 @@ class Options:
+         factory=True,
+     )
+     # --------------------------------------------------------------- model
+-    rho_max: float = _option(
+-        2e4, "Largest physically acceptable density in SI units.", "model"
+-    )
+-    P_max: float = _option(
+-        1e13, "Largest physically acceptable pressure in SI units.", "model"
+-    )
+     baro_param_init: list = _option(
+         None,
+         "Parameters of the barotrope set via set_barotrope().",
+         "model",
+     )
+-    dens_param_init: list = _option(
+-        None,
+-        "Parameters of the density function set via set_density_function().",
+-        "model",
+-    )
+     use_atmosphere: bool = _option(
+         False,
+         "Use an atmospheric model for the outermost densities.",
+diff --git a/PyToF/sampling.py b/PyToF/sampling.py
+deleted file mode 100644
+index fc245c0..0000000
+--- a/PyToF/sampling.py
++++ /dev/null
+@@ -1,516 +0,0 @@
+-"""
+-Model-independent MCMC machinery: convergence checks, the sampling loop,
+-a resumable chain on disk, and saving of distinct models that fit.
+-
+-Nothing in here knows about planets. The model enters through the function
+-``log_prob(param, ...) -> (log probability, blob)``, where the blob is the
+-*worst deviation in sigma* of the model from the data (``inf`` if the model
+-could not be built). A model counts as fitting if its blob is below
+-``SaveFits.n_sigma``.
+-
+-The convergence checks and the idea to save good models while the chain is
+-still running are taken from the MCMC of the Uranus/Neptune interior models
+-(newUranusNeptune/mcmc.py).
+-"""
+-
+-import csv
+-import os
+-from dataclasses import dataclass
+-from pathlib import Path
+-
+-import emcee
+-import numpy as np
+-
+-from PyToF.messages import say
+-
+-# ---------------------------------------------------------------- settings
+-
+-
+-@dataclass
+-class ConvergenceCriteria:
+-    """
+-    The chain counts as converged if all five checks pass (they are evaluated
+-    every ``check_every`` steps):
+-
+-    length          the chain is longer than ``tau_factor`` autocorrelation
+-                    times (emcee recommends 50)
+-    tau stable      the longest autocorrelation time changed by less than
+-                    ``tau_rel_change`` (relative) since the previous check
+-    ESS             at least ``n_eff_target`` effective independent samples
+-                    after the burn-in (twice the autocorrelation time)
+-    acceptance      the mean acceptance fraction is inside ``acc_range``
+-                    (with few parameters the stretch move accepts 0.7-0.8)
+-    stationary      the median log probability of the third and fourth
+-                    quarter of the chain agree within ``stationarity_sigma``
+-                    standard errors, i.e. the chain no longer drifts
+-    """
+-
+-    check_every: int = 100
+-    tau_factor: float = 50.0
+-    tau_rel_change: float = 0.01
+-    n_eff_target: float = 1000.0
+-    acc_range: tuple = (0.1, 0.9)
+-    stationarity_sigma: float = 4.0
+-
+-    def __post_init__(self):
+-        if self.check_every < 1:
+-            raise ValueError("check_every must be at least 1.")
+-        low, high = self.acc_range
+-        if not 0 <= low < high <= 1:
+-            raise ValueError("acc_range must satisfy 0 <= low < high <= 1.")
+-
+-
+-@dataclass
+-class SaveFits:
+-    """
+-    Save models that fit the data *while the chain is running*, so that a run
+-    that never converges still delivers something.
+-
+-    Every ``check_every`` steps, the samples drawn since the last check that
+-    fit (every J within ``n_sigma`` of its target) are looked at, best fit
+-    first. A sample is saved only if it is different enough from all models
+-    saved so far: the root-mean-square distance of the parameters, each in
+-    units of its standard deviation in the chain, must be at least
+-    ``min_distance``.
+-
+-    directory       Where the models and ``index.csv`` are written.
+-    n_sigma         A model fits if each J is within this many sigma.
+-    min_distance    Minimum distance between saved models, see above. 0
+-                    saves every fitting sample except exact repeats.
+-    max_models      Stop the run once this many models are saved (counting
+-                    those already in ``directory``). None: no limit.
+-    burn_in         Steps at the start of the chain that are never saved from.
+-    log_CGS_units   Write radii in cm and log10 of density and pressure in
+-                    g/cm^3 and bar (as classify_and_save_state does).
+-    file_name       Prefix of the model files.
+-    """
+-
+-    directory: str
+-    n_sigma: float = 1.0
+-    min_distance: float = 0.1
+-    max_models: int = None
+-    burn_in: int = 100
+-    log_CGS_units: bool = False
+-    file_name: str = "model"
+-
+-    def __post_init__(self):
+-        if self.n_sigma <= 0:
+-            raise ValueError("n_sigma must be positive.")
+-        if self.min_distance < 0:
+-            raise ValueError("min_distance must not be negative.")
+-        self.directory = os.fspath(self.directory)
+-
+-
+-@dataclass
+-class MCMCResult:
+-    """
+-    Outcome of a run. ``state`` and ``autocorr`` are what run_baro_MC and
+-    run_dens_MC return; the rest says how the run went.
+-
+-    state           Positions of the walkers after the last step
+-                    (nwalkers, nparameters).
+-    autocorr        Mean autocorrelation time at every multiple of
+-                    ``check_every`` steps.
+-    converged       Whether all convergence checks passed.
+-    failed_checks   Names of the checks that did not pass (empty if converged).
+-    diagnostics     The numbers of the last check, see :func:`diagnose`.
+-    history         Array with one row per check: step, longest
+-                    autocorrelation time, acceptance fraction, effective
+-                    sample size, drift of the log probability in sigma.
+-    chain, log_prob, blobs
+-                    The complete chain (steps, walkers, ...), its log
+-                    probabilities, and the worst deviation in sigma of every
+-                    sample.
+-    n_fits_saved    Models in ``save_fits.directory`` after the run.
+-    stopped_early   True if the run ended because ``max_models`` were saved.
+-    """
+-
+-    state: np.ndarray
+-    autocorr: np.ndarray
+-    converged: bool
+-    failed_checks: list
+-    diagnostics: dict
+-    history: np.ndarray
+-    chain: np.ndarray
+-    log_prob: np.ndarray
+-    blobs: np.ndarray
+-    n_fits_saved: int = 0
+-    stopped_early: bool = False
+-    save_directory: str = None
+-
+-    def save(self, path):
+-        """Write the chain and the diagnostics to a ``.npz`` file."""
+-
+-        np.savez(
+-            path,
+-            chain=self.chain,
+-            log_prob=self.log_prob,
+-            blobs=self.blobs,
+-            state=self.state,
+-            autocorr=self.autocorr,
+-            history=self.history,
+-            tau=self.diagnostics["tau"],
+-            converged=self.converged,
+-            failed_checks=np.array(self.failed_checks),
+-        )
+-
+-
+-# ------------------------------------------------------------- diagnostics
+-
+-
+-def diagnose(sampler, old_tau_max, criteria):
+-    """The five convergence checks of the chain so far, with their numbers."""
+-
+-    n = sampler.iteration
+-    tau = sampler.get_autocorr_time(tol=0)
+-    tau_max = np.max(tau)
+-    acc = np.mean(sampler.acceptance_fraction)
+-
+-    finite = bool(np.isfinite(tau_max))
+-    burn = int(np.ceil(2 * tau_max)) if finite else n
+-    ess = sampler.nwalkers * max(n - burn, 0) / tau_max if finite else 0.0
+-
+-    # Stationarity: ensemble-median log probability of the third and fourth
+-    # quarter of the chain, compared via the standard error of their means
+-    # (corrected for the autocorrelation):
+-    log_prob = np.median(sampler.get_log_prob(), axis=1)
+-    quarter = n // 4
+-    if quarter > 0 and finite:
+-        a = log_prob[2 * quarter : 3 * quarter]
+-        b = log_prob[3 * quarter : 4 * quarter]
+-        se = np.sqrt((a.var() + b.var()) / max(quarter / tau_max, 1.0))
+-        if se > 0:
+-            shift = abs(a.mean() - b.mean()) / se
+-        else:
+-            shift = 0.0 if a.mean() == b.mean() else np.inf
+-    else:
+-        shift = np.inf
+-
+-    with np.errstate(all="ignore"):
+-        tau_change = abs(old_tau_max - tau_max) / tau_max
+-
+-    checks = {
+-        "length": bool(n > criteria.tau_factor * tau_max),
+-        "tau stable": bool(tau_change < criteria.tau_rel_change),
+-        "ESS": bool(ess >= criteria.n_eff_target),
+-        "acceptance": bool(
+-            criteria.acc_range[0] <= acc <= criteria.acc_range[1]
+-        ),
+-        "stationary": bool(shift < criteria.stationarity_sigma),
+-    }
+-
+-    return dict(
+-        iteration=n,
+-        tau=tau,
+-        tau_max=tau_max,
+-        acc=acc,
+-        ess=ess,
+-        burn=burn,
+-        shift=shift,
+-        checks=checks,
+-        converged=all(checks.values()),
+-    )
+-
+-
+-# --------------------------------------------------------- distinct models
+-
+-
+-def select_distinct(params, quality, saved, scale, min_distance, limit=None):
+-    """
+-    Choose which candidate models to keep.
+-
+-    Candidates are visited best first (lowest ``quality``). One is kept if its
+-    root-mean-square distance, with every parameter divided by ``scale``, to
+-    all kept candidates and to all ``saved`` models is at least
+-    ``min_distance``. Exact repeats (distance 0) are never kept.
+-
+-    Returns the indices of the kept candidates, best first.
+-    """
+-
+-    params = np.atleast_2d(params)
+-    saved = np.asarray(saved, dtype=float).reshape(-1, params.shape[1])
+-    scale = np.asarray(scale, dtype=float)
+-    kept = []
+-    reference = saved / scale
+-
+-    for i in np.argsort(quality, kind="stable"):
+-        if limit is not None and len(kept) >= limit:
+-            break
+-
+-        point = params[i] / scale
+-        if len(reference):
+-            distance = np.sqrt(np.mean((reference - point) ** 2, axis=1))
+-            if np.min(distance) < max(min_distance, np.finfo(float).tiny):
+-                continue
+-
+-        kept.append(int(i))
+-        reference = np.vstack([reference, point])
+-
+-    return kept
+-
+-
+-class FitSaver:
+-    """
+-    Saves distinct fitting models after every convergence check, see
+-    :class:`SaveFits`. The models already in the directory (from an earlier,
+-    interrupted run) count and are respected when judging distinctness.
+-    """
+-
+-    def __init__(self, settings, ndim):
+-        self.settings = settings
+-        self.ndim = ndim
+-        self.directory = Path(settings.directory)
+-        self.directory.mkdir(parents=True, exist_ok=True)
+-        self.index_path = self.directory / "index.csv"
+-        self.next_step = 0
+-        self.counter = 0
+-        self.saved = np.empty((0, ndim))
+-
+-        if self.index_path.exists():
+-            with open(self.index_path, newline="") as f:
+-                rows = list(csv.DictReader(f))
+-            self.counter = len(rows)
+-            self.saved = np.array(
+-                [[float(r[f"p{k}"]) for k in range(ndim)] for r in rows]
+-            ).reshape(-1, ndim)
+-
+-    @property
+-    def n_saved(self):
+-        return len(self.saved)
+-
+-    def full(self):
+-        limit = self.settings.max_models
+-        return limit is not None and self.n_saved >= limit
+-
+-    def update(self, sampler, diagnostics, save_model, pool, verbosity):
+-        """
+-        Look at the samples since the last call, save the distinct fitting
+-        ones, and return True once ``max_models`` models are saved.
+-
+-        save_model((param, k)) -> worst deviation in sigma, or None if the
+-        model could not be saved (e.g. it does not fit when re-evaluated).
+-        """
+-
+-        settings = self.settings
+-        n_steps = sampler.iteration
+-        start = max(self.next_step, settings.burn_in)
+-        self.next_step = n_steps
+-
+-        if start >= n_steps or self.full():
+-            return self.full()
+-
+-        chain = sampler.get_chain(discard=start).reshape(-1, self.ndim)
+-        worst = sampler.get_blobs(discard=start).reshape(-1).astype(float)
+-        fits = np.where(worst < settings.n_sigma)[0]
+-
+-        n_new = 0
+-        if len(fits):
+-            everything = sampler.get_chain(discard=settings.burn_in)
+-            scale = everything.reshape(-1, self.ndim).std(axis=0)
+-            scale[scale == 0] = 1.0
+-
+-            limit = None
+-            if settings.max_models is not None:
+-                limit = settings.max_models - self.n_saved
+-
+-            order = select_distinct(
+-                chain[fits],
+-                worst[fits],
+-                self.saved,
+-                scale,
+-                settings.min_distance,
+-                limit=limit,
+-            )
+-
+-            mapper = pool.map if pool is not None else map
+-            jobs = [
+-                (chain[fits][i], self.counter + k) for k, i in enumerate(order)
+-            ]
+-            self.counter += len(jobs)
+-            results = list(mapper(save_model, jobs))
+-
+-            rows = []
+-            for (param, k), sigma in zip(jobs, results, strict=True):
+-                if sigma is None:
+-                    continue
+-                rows.append(
+-                    [
+-                        f"{settings.file_name}_{k}",
+-                        n_steps,
+-                        f"{sigma:.6g}",
+-                        diagnostics["converged"],
+-                        f"{diagnostics['ess']:.6g}",
+-                        f"{diagnostics['tau_max']:.6g}",
+-                        *[repr(float(p)) for p in param],
+-                    ]
+-                )
+-                self.saved = np.vstack([self.saved, param])
+-            n_new = len(rows)
+-            self._append_rows(rows)
+-
+-        say(
+-            verbosity,
+-            1,
+-            "[MCMC] step {step}: {n_fit} fitting samples, {n_new} new "
+-            "distinct models saved ({total} in {directory})",
+-            n_fit=len(fits),
+-            n_new=n_new,
+-            total=self.n_saved,
+-            directory=str(self.directory),
+-            step=n_steps,
+-        )
+-
+-        return self.full()
+-
+-    def _append_rows(self, rows):
+-        if not rows:
+-            return
+-
+-        new_file = not self.index_path.exists()
+-        with open(self.index_path, "a", newline="") as f:
+-            writer = csv.writer(f)
+-            if new_file:
+-                writer.writerow(
+-                    [
+-                        "name",
+-                        "step",
+-                        "worst_sigma",
+-                        "converged",
+-                        "ess",
+-                        "tau_max",
+-                    ]
+-                    + [f"p{k}" for k in range(self.ndim)]
+-                )
+-            writer.writerows(rows)
+-
+-
+-# ------------------------------------------------------------ the sampling
+-
+-
+-def open_checkpoint(path, nwalkers, ndim, verbosity):
+-    """
+-    Open the chain on disk. Returns (backend, resumed): resumed is True if
+-    the file already holds a chain of exactly this shape, which is then
+-    continued.
+-    """
+-
+-    if path is None:
+-        return None, False
+-
+-    try:
+-        import h5py  # noqa: F401
+-    except ImportError:
+-        raise ImportError(
+-            "Writing the chain to disk (checkpoint=...) needs h5py: "
+-            "pip install h5py"
+-        ) from None
+-
+-    backend = emcee.backends.HDFBackend(os.fspath(path))
+-    resumed = (
+-        backend.initialized
+-        and backend.iteration > 0
+-        and backend.shape == (nwalkers, ndim)
+-    )
+-    if resumed:
+-        say(
+-            verbosity,
+-            1,
+-            "Resuming the chain from {path} at step {step}",
+-            path=os.fspath(path),
+-            step=backend.iteration,
+-        )
+-    else:
+-        backend.reset(nwalkers, ndim)
+-
+-    return backend, resumed
+-
+-
+-def run_sampler(
+-    log_prob,
+-    log_prob_args,
+-    param_0,
+-    steps,
+-    criteria,
+-    pool=None,
+-    progress=False,
+-    backend=None,
+-    resumed=False,
+-    callback=None,
+-    verbosity=0,
+-):
+-    """
+-    Run emcee in chunks of ``criteria.check_every`` steps until all
+-    convergence checks pass, ``steps`` is reached, or the callback returns
+-    True. Returns (sampler, diagnostics, history, autocorr).
+-
+-    ``callback(sampler, diagnostics)`` is called after every chunk.
+-    """
+-
+-    nwalkers, ndim = param_0.shape
+-    sampler = emcee.EnsembleSampler(
+-        nwalkers,
+-        ndim,
+-        log_prob,
+-        args=log_prob_args,
+-        pool=pool,
+-        backend=backend,
+-    )
+-
+-    state = None if resumed else param_0
+-    old_tau_max = np.inf
+-    diagnostics = None
+-    history = []
+-    autocorr = []
+-    stopped_early = False
+-
+-    while sampler.iteration < steps:
+-        n_chunk = min(criteria.check_every, steps - sampler.iteration)
+-        state = sampler.run_mcmc(state, n_chunk, progress=progress)
+-        diagnostics = diagnose(sampler, old_tau_max, criteria)
+-        old_tau_max = diagnostics["tau_max"]
+-
+-        history.append(
+-            (
+-                diagnostics["iteration"],
+-                diagnostics["tau_max"],
+-                diagnostics["acc"],
+-                diagnostics["ess"],
+-                diagnostics["shift"],
+-            )
+-        )
+-        if sampler.iteration % criteria.check_every == 0:
+-            autocorr.append(np.mean(diagnostics["tau"]))
+-
+-        failed = [k for k, ok in diagnostics["checks"].items() if not ok]
+-        say(
+-            verbosity,
+-            1,
+-            "[MCMC] step {step}: tau_max={tau:.1f}, acceptance={acc:.2f}, "
+-            "ESS={ess:.0f}, drift={shift:.1f} sigma | {status}",
+-            kind="info" if diagnostics["converged"] else "warn",
+-            step=diagnostics["iteration"],
+-            tau=diagnostics["tau_max"],
+-            acc=diagnostics["acc"],
+-            ess=diagnostics["ess"],
+-            shift=diagnostics["shift"],
+-            status="converged"
+-            if not failed
+-            else "not yet: " + ", ".join(failed),
+-        )
+-
+-        if callback is not None and callback(sampler, diagnostics):
+-            stopped_early = True
+-            break
+-        if diagnostics["converged"]:
+-            break
+-
+-    if diagnostics is None:  # a resumed chain that already has enough steps
+-        diagnostics = diagnose(sampler, old_tau_max, criteria)
+-
+-    return (
+-        sampler,
+-        diagnostics,
+-        np.array(history),
+-        np.array(autocorr),
+-        stopped_early,
+-    )
+diff --git a/README.md b/README.md
+index b03d78d..f63e72d 100644
+--- a/README.md
++++ b/README.md
+@@ -13,7 +13,9 @@ Download or clone this repository, navigate into the directory and execute
+ pip install .
+ ```
+ 
+-Note that the package requires numpy, scipy, matplotlib, emcee and tqdm.
++Note that the package requires numpy, scipy and matplotlib.
++
++Sampling the interior parameters of a planet (MCMC) is not part of PyToF; see the separate package PyToF_MCMC, which uses PyToF as a library.
+ 
+ ## Basic usage
+ 
+@@ -88,14 +90,6 @@ Below you can find a few figures that illustrate PyToF's capabilities, in partiu
+ ![plot_shape_polar](/PyToF_Tutorial_images/plot_shape_polar_1_7_0.png "X.plot_shape()")
+ ![plot_shape_cartesian](/PyToF_Tutorial_images/plot_shape_cartesian_1_7_0.png "X.plot_shape()")
+ 
+-### X.plot_state_xy()
+-
+-![plot_state_xy](/PyToF_Tutorial_images/plot_state_xy_1_7_0.png "X.plot_state_xy()")
+-
+-### X.plot_state_xy_corr()
+-
+-![plot_state_xy_corr](/PyToF_Tutorial_images/plot_state_corr_xy_1_7_0.png "X.plot_state_xy_corr()")
+-
+ ## Accuracy and Convergence
+ 
+ We demonstrate the accuracy of PyToF when compared against 
+diff --git a/pyproject.toml b/pyproject.toml
+index 6b1cd6f..8501553 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -14,14 +14,11 @@ dependencies = [
+     "numpy>=1.26",
+     "scipy>=1.12",  # scipy.integrate.cumulative_simpson was added in 1.12
+     "matplotlib>=3.7",
+-    "emcee>=3.1",
+-    "tqdm>=4.60",
+ ]
+ 
+ [project.optional-dependencies]
+-checkpoint = ["h5py>=3"]  # resumable MCMC chains (run_mcmc(checkpoint=...))
+-test = ["pytest>=7", "h5py>=3"]
+-dev = ["pytest>=7", "h5py>=3", "ruff"]
++test = ["pytest>=7"]
++dev = ["pytest>=7", "ruff"]
+ 
+ [tool.setuptools.packages.find]
+ include = ["PyToF*"]
+diff --git a/tests/cases.py b/tests/cases.py
+index d1bea7c..cc7db18 100644
+--- a/tests/cases.py
++++ b/tests/cases.py
+@@ -119,7 +119,6 @@ def _density_case():
+         R_phys=[radius, "mean"],
+         Period=24 * 3600,
+         order=4,
+-        dens_param_init=[1.0] * 5,
+     )
+     X.li = radii
+     X.rhoi = rho0 * np.ones(N)
+@@ -129,9 +128,8 @@ def _density_case():
+         / (X.opts["G"] * mass)
+     )
+     # relax_to_density() keeps the densities it is given (it only updates
+-    # shape and pressure), so we set them from the density function here.
+-    X.set_density_function(_dens_piecewise)
+-    X.rhoi = _dens_piecewise(X.li, mass, X.opts["dens_param_init"])
++    # shape and pressure), so we set them from a density profile here.
++    X.rhoi = _dens_piecewise(X.li, mass, [1.0] * 5)
+     X.relax_to_density()
+     return X
+ 
+@@ -190,60 +188,3 @@ def summarize(X):
+         "rhoi_sample": X.rhoi[idx].tolist(),
+         "Pi_sample": X.Pi[idx].tolist(),
+     }
+-
+-
+-def _is_not_positive(param):
+-    return bool(np.any(np.asarray(param) <= 0))
+-
+-
+-def mcmc_summary():
+-    """
+-    Seeded serial MCMC runs of both models. The barotrope run is long enough
+-    (100 steps) to reach the autocorrelation check, the density run is short.
+-    """
+-
+-    targets = dict(
+-        target_Js=np.array([1.3988e-2, -5.318e-4]),
+-        sigma_Js=np.array([1e-4, 1e-5]),
+-    )
+-    summary = {}
+-
+-    X = ClassToF.ToF(
+-        N=16,
+-        order=4,
+-        R_ref=R_JUPITER,
+-        baro_param_init=[1.0],
+-        **targets,
+-    )
+-    X.set_barotrope(_barotrope_K)
+-    X.set_check_param(_is_not_positive)
+-    np.random.seed(3)
+-    state, autocorr = X.run_baro_MC(4, 100, parallelize=False)
+-    summary["baro_state"] = state.tolist()
+-    summary["baro_autocorr"] = autocorr.tolist()
+-    summary["baro_costs"] = [
+-        float(X.baro_cost_function(np.array([k]))) for k in (0.5, 1.0, 2.0)
+-    ]
+-    summary["baro_costs_separate"] = list(
+-        X.baro_cost_function(np.array([1.0]), return_sum=False)
+-    )
+-
+-    Y = ClassToF.ToF(
+-        N=16,
+-        order=4,
+-        R_ref=R_JUPITER,
+-        dens_param_init=[1.0] * 2,
+-        **targets,
+-    )
+-    Y.set_density_function(_dens_piecewise)
+-    Y.set_check_param(lambda param: bool(np.any(np.asarray(param) < 0)))
+-    np.random.seed(5)
+-    state, autocorr = Y.run_dens_MC(4, 20, parallelize=False)
+-    summary["dens_state"] = state.tolist()
+-    summary["dens_autocorr"] = autocorr.tolist()
+-    summary["dens_costs"] = [
+-        float(Y.dens_cost_function(np.array(p)))
+-        for p in ([1, 1], [0.5, 2], [3, 0.1])
+-    ]
+-
+-    return summary
+diff --git a/tests/golden/mcmc.json b/tests/golden/mcmc.json
+deleted file mode 100644
+index 89aa16a..0000000
+--- a/tests/golden/mcmc.json
++++ /dev/null
+@@ -1,52 +0,0 @@
+-{
+- "baro_autocorr": [
+-  11.056553977945981
+- ],
+- "baro_costs": [
+-  -0.2784350576040061,
+-  -0.278435057603938,
+-  -0.2784350576040061
+- ],
+- "baro_costs_separate": [
+-  -0.07957318179952974,
+-  -0.19886187580440826
+- ],
+- "baro_state": [
+-  [
+-   741.3540270644639
+-  ],
+-  [
+-   1243.2704834223898
+-  ],
+-  [
+-   3820.441044083158
+-  ],
+-  [
+-   1173.1070094449428
+-  ]
+- ],
+- "dens_autocorr": [],
+- "dens_costs": [
+-  -123.40000020595608,
+-  -953.3218575887487,
+-  -1192.6071164351968
+- ],
+- "dens_state": [
+-  [
+-   0.3746890392764578,
+-   0.6080533574414853
+-  ],
+-  [
+-   0.3307192694782838,
+-   0.8140360472087741
+-  ],
+-  [
+-   0.42609619685985867,
+-   0.6831754922749758
+-  ],
+-  [
+-   0.4638212330020817,
+-   0.6990985297832589
+-  ]
+- ]
+-}
+\ No newline at end of file
+diff --git a/tests/test_mcmc.py b/tests/test_mcmc.py
+deleted file mode 100644
+index b39f599..0000000
+--- a/tests/test_mcmc.py
++++ /dev/null
+@@ -1,37 +0,0 @@
+-"""
+-Seeded MCMC results must not change under refactoring.
+-
+-tests/golden/mcmc.json was produced by the implementation from before the
+-barotrope/density duplicates were merged. It depends on the random-number
+-stream of NumPy and emcee, so the tolerance is loose enough for round-off
+-but not for a changed sampler.
+-"""
+-
+-import json
+-from pathlib import Path
+-
+-import numpy as np
+-import pytest
+-
+-from tests.cases import mcmc_summary
+-
+-GOLDEN = json.loads(
+-    (Path(__file__).parent / "golden" / "mcmc.json").read_text()
+-)
+-
+-
+-@pytest.fixture(scope="module")
+-def summary():
+-    return mcmc_summary()
+-
+-
+-@pytest.mark.parametrize("key", sorted(GOLDEN))
+-def test_mcmc_matches_golden(summary, key):
+-    np.testing.assert_allclose(
+-        summary[key], GOLDEN[key], rtol=1e-9, atol=1e-30, err_msg=key
+-    )
+-
+-
+-def test_both_models_reach_the_autocorrelation_check_or_stay_short(summary):
+-    assert len(summary["baro_autocorr"]) == 1  # 100 steps -> one check
+-    assert summary["dens_autocorr"] == []  # 20 steps -> none
+diff --git a/tests/test_options.py b/tests/test_options.py
+index a7c45f6..81b7601 100644
+--- a/tests/test_options.py
++++ b/tests/test_options.py
+@@ -19,15 +19,15 @@ def test_defaults_are_the_wisdom_hubbard_jupiter():
+     assert opts["order"] == 4
+     assert opts["R_phys"] == [71492000, "equatorial"]
+     assert opts["M_phys"] == 126686536.1 * (1000) ** 3 / 6.6738480e-11
+-    assert opts["target_Js"][0] == 1.398851089834702e-2
++    assert opts["baro_param_init"] is None
+     assert opts["alphas"].shape == (12,)
+ 
+ 
+ def test_array_defaults_are_not_shared_between_instances():
+     a, b = Options(), Options()
+-    a["target_Js"][0] = 0.0
++    a["alphas"][0] = 1.0
+     a["R_phys"][0] = 1.0
+-    assert b["target_Js"][0] != 0.0
++    assert b["alphas"][0] == 0.0
+     assert b["R_phys"][0] == 71492000
+ 
+ 
+@@ -163,10 +163,6 @@ RENAMED = {
+     "MaxIterUpdate": "max_iter_update",
+     "MaxIterBar": "max_iter_barotrope",
+     "MaxIterDen": "max_iter_density",
+-    "Target_Js": "target_Js",
+-    "Sigma_Js": "sigma_Js",
+-    "rho_MAX": "rho_max",
+-    "P_MAX": "P_max",
+ }
+ 
+ 
+@@ -216,8 +212,8 @@ def test_new_names_do_not_warn():
+ 
+     with warnings.catch_warnings():
+         warnings.simplefilter("error")
+-        opts = Options.from_kwargs(max_iter_barotrope=3, target_Js=[1.0])
+-        opts["rho_max"] = 1e4
++        opts = Options.from_kwargs(max_iter_barotrope=3, max_iter_update=4)
++        opts["max_iter_density"] = 5
+         assert opts.max_iter_barotrope == 3
+ 
+ 
+diff --git a/tests/test_properties.py b/tests/test_properties.py
+index 21bd5f0..4bb82fa 100644
+--- a/tests/test_properties.py
++++ b/tests/test_properties.py
+@@ -86,18 +86,11 @@ def test_public_api_surface():
+         "relax_to_barotrope",
+         "relax_to_density",
+         "set_barotrope",
+-        "set_density_function",
+-        "set_check_param",
+         "get_Js_errors",
+         "get_NMoI",
+         "get_Kn",
+         "get_r_l_mu",
+         "get_U_l_mu",
+-        "run_baro_MC",
+-        "run_dens_MC",
+-        "baro_cost_function",
+-        "dens_cost_function",
+-        "classify_and_save_state",
+     ]
+     for name in methods:
+         assert callable(getattr(X, name)), name
+diff --git a/tests/test_sampling.py b/tests/test_sampling.py
+deleted file mode 100644
+index 5abf36e..0000000
+--- a/tests/test_sampling.py
++++ /dev/null
+@@ -1,556 +0,0 @@
+-"""
+-The MCMC driver: convergence, saving fits during the chain, robustness.
+-
+-Most of the logic (convergence checks, selection of distinct models, saving
+-and resuming) does not know about planets and is tested with an analytic
+-model that is evaluated in microseconds. A few small tests then run the real
+-ToF model. One evaluation of it takes ~0.05 s even for tiny grids, hence the
+-loose solver tolerances and the few walkers and steps there.
+-"""
+-
+-import csv
+-import functools
+-
+-import numpy as np
+-import pytest
+-
+-from PyToF import ClassToF, ConvergenceCriteria, MCMCResult, SaveFits
+-from PyToF.MonteCarloToF import _write_profile
+-from PyToF.sampling import FitSaver, diagnose, run_sampler, select_distinct
+-from tests.cases import (
+-    R_JUPITER,
+-    _barotrope_K,
+-    _is_not_positive,
+-    jupiter_polytrope,
+-)
+-
+-# ------------------------------------------------- synthetic model helpers
+-
+-CENTER = np.array([3.0, -2.0])
+-
+-
+-def gaussian(param, center):
+-    """Unit Gaussian; the blob is the distance from the centre in sigma."""
+-
+-    d = param - center
+-    return -0.5 * np.sum(d**2), float(np.sqrt(np.sum(d**2)))
+-
+-
+-def fake_save(center, job):
+-    """Stands in for writing a model: returns the worst deviation in sigma."""
+-
+-    param, _ = job
+-    return float(np.sqrt(np.sum((param - center) ** 2)))
+-
+-
+-def start_positions(nwalkers=16):
+-    np.random.seed(0)
+-    return CENTER + 3 * np.random.RandomState(1).normal(size=(nwalkers, 2))
+-
+-
+-def run_synthetic(directory, steps=400, **settings):
+-    """Gaussian chain with a FitSaver; returns (saver, run_sampler result)."""
+-
+-    options = dict(burn_in=100, n_sigma=1.5, min_distance=0.5)
+-    options.update(settings)
+-    saver = FitSaver(SaveFits(directory, **options), 2)
+-    save_model = functools.partial(fake_save, CENTER)
+-
+-    outcome = run_sampler(
+-        gaussian,
+-        [CENTER],
+-        start_positions(),
+-        steps,
+-        ConvergenceCriteria(check_every=100),
+-        callback=lambda sampler, diagnostics: saver.update(
+-            sampler, diagnostics, save_model, None, 0
+-        ),
+-    )
+-
+-    return saver, outcome
+-
+-
+-def read_index(directory):
+-    with open(directory / "index.csv", newline="") as f:
+-        return list(csv.DictReader(f))
+-
+-
+-# -------------------------------------------------------- select_distinct
+-
+-
+-def test_select_distinct_prefers_the_best_and_skips_close_ones():
+-    params = np.array([[0.0], [0.05], [1.0], [1.02], [2.0]])
+-    quality = np.array([0.5, 0.1, 0.3, 0.2, 0.9])
+-    kept = select_distinct(params, quality, np.empty((0, 1)), [1.0], 0.1)
+-    # best first: 0.05 (0.1), then 1.02 (0.2), then 1.0 too close to 1.02,
+-    # then 0.0 too close to 0.05; 2.0 is far from both
+-    assert kept == [1, 3, 4]
+-
+-
+-def test_select_distinct_respects_models_already_saved_and_the_limit():
+-    params = np.array([[0.0], [1.0], [2.0], [3.0]])
+-    quality = np.array([0.1, 0.2, 0.3, 0.4])
+-    kept = select_distinct(params, quality, [[1.0]], [1.0], 0.5, limit=2)
+-    assert kept == [0, 2]  # 1.0 is saved already, the limit stops at two
+-
+-
+-def test_select_distinct_uses_the_scale_of_each_parameter():
+-    params = np.array([[0.0, 0.0], [0.0, 10.0]])
+-    quality = np.array([0.1, 0.2])
+-    # far apart in the second parameter, but that one varies by +-100:
+-    assert select_distinct(params, quality, [[0, 0]], [1, 100], 0.5) == []
+-    assert select_distinct(params, quality, [[0, 0]], [1, 1], 0.5) == [1]
+-
+-
+-def test_select_distinct_never_keeps_exact_repeats_even_for_zero_distance():
+-    params = np.array([[1.0], [1.0], [2.0]])
+-    quality = np.array([0.1, 0.2, 0.3])
+-    kept = select_distinct(params, quality, np.empty((0, 1)), [1.0], 0.0)
+-    assert kept == [0, 2]
+-
+-
+-# --------------------------------------------------------------- settings
+-
+-
+-def test_convergence_criteria_validation():
+-    with pytest.raises(ValueError):
+-        ConvergenceCriteria(check_every=0)
+-    with pytest.raises(ValueError):
+-        ConvergenceCriteria(acc_range=(0.7, 0.1))
+-
+-
+-def test_save_fits_validation(tmp_path):
+-    with pytest.raises(ValueError):
+-        SaveFits(tmp_path, n_sigma=0)
+-    with pytest.raises(ValueError):
+-        SaveFits(tmp_path, min_distance=-1)
+-
+-
+-# ------------------------------------------------------ convergence checks
+-
+-
+-def test_a_well_behaved_chain_converges_and_stops():
+-    # (The tau estimate of a short chain fluctuates by a few per cent.)
+-    criteria = ConvergenceCriteria(
+-        check_every=200, n_eff_target=200, tau_rel_change=0.1
+-    )
+-    sampler, diagnostics, history, autocorr, stopped = run_sampler(
+-        gaussian, [CENTER], start_positions(20), 6000, criteria
+-    )
+-    assert diagnostics["converged"]
+-    assert all(diagnostics["checks"].values())
+-    assert sampler.iteration < 6000  # stopped early
+-    assert len(history) == len(autocorr) == sampler.iteration // 200
+-    assert not stopped  # not stopped by a callback
+-
+-
+-def test_a_short_chain_is_not_converged_and_says_why():
+-    _, diagnostics, history, _, _ = run_sampler(
+-        gaussian,
+-        [CENTER],
+-        start_positions(),
+-        100,
+-        ConvergenceCriteria(check_every=50),
+-    )
+-    assert not diagnostics["converged"]
+-    assert not diagnostics["checks"]["length"]
+-    assert set(diagnostics["checks"]) == {
+-        "length",
+-        "tau stable",
+-        "ESS",
+-        "acceptance",
+-        "stationary",
+-    }
+-    assert history.shape == (2, 5)
+-
+-
+-class StubSampler:
+-    """Just enough of an emcee sampler to feed the convergence checks."""
+-
+-    def __init__(self, log_prob, tau=5.0, acceptance=0.4):
+-        self.log_prob = log_prob
+-        self.iteration, self.nwalkers = log_prob.shape
+-        self.tau = tau
+-        self.acceptance_fraction = np.full(self.nwalkers, acceptance)
+-
+-    def get_autocorr_time(self, tol=0):
+-        return np.array([self.tau, 0.5 * self.tau])
+-
+-    def get_log_prob(self):
+-        return self.log_prob
+-
+-
+-def stationary_noise(steps=400, walkers=10, seed=0):
+-    return np.random.RandomState(seed).normal(size=(steps, walkers))
+-
+-
+-def test_diagnose_passes_a_healthy_chain():
+-    sampler = StubSampler(stationary_noise())
+-    criteria = ConvergenceCriteria(n_eff_target=100)
+-    result = diagnose(sampler, old_tau_max=5.0, criteria=criteria)
+-    assert result["checks"] == dict.fromkeys(result["checks"], True)
+-    assert result["converged"]
+-    assert result["burn"] == 10  # twice the autocorrelation time
+-    assert result["ess"] == pytest.approx(10 * (400 - 10) / 5.0)
+-
+-
+-@pytest.mark.parametrize(
+-    "check, change",
+-    [
+-        ("length", dict(tau=20.0)),  # 400 steps < 50 * 20
+-        ("tau stable", dict(old_tau_max=8.0)),  # tau moved by 60%
+-        ("ESS", dict(n_eff_target=1e6)),
+-        ("acceptance", dict(acceptance=0.02)),
+-        ("stationary", dict(drift=True)),
+-    ],
+-)
+-def test_each_convergence_check_can_fail_on_its_own(check, change):
+-    log_prob = stationary_noise()
+-    if change.get("drift"):
+-        # a trend of 20 sigma over the run:
+-        log_prob = log_prob + np.linspace(0, 20, 400)[:, None]
+-
+-    sampler = StubSampler(
+-        log_prob,
+-        tau=change.get("tau", 5.0),
+-        acceptance=change.get("acceptance", 0.4),
+-    )
+-    criteria = ConvergenceCriteria(
+-        n_eff_target=change.get("n_eff_target", 100.0)
+-    )
+-    result = diagnose(sampler, change.get("old_tau_max", 5.0), criteria)
+-
+-    assert result["checks"][check] is False
+-    others = {k: v for k, v in result["checks"].items() if k != check}
+-    # (a longer tau also lowers the ESS, and a trend also lengthens... only
+-    # the check under test has to fail, the rest is allowed to follow)
+-    assert not result["converged"]
+-    if check in ("tau stable", "acceptance", "stationary"):
+-        assert all(others.values())
+-
+-
+-def test_diagnose_without_a_finite_tau_never_converges():
+-    sampler = StubSampler(stationary_noise(), tau=np.inf)
+-    result = diagnose(sampler, 5.0, ConvergenceCriteria())
+-    assert not result["converged"]
+-    assert result["ess"] == 0.0 and result["shift"] == np.inf
+-
+-
+-# ------------------------------------------------------ saving (synthetic)
+-
+-
+-def test_fits_are_saved_during_the_chain_and_are_distinct(tmp_path):
+-    saver, _ = run_synthetic(tmp_path / "fits")
+-    rows = read_index(tmp_path / "fits")
+-    params = np.array([[float(r["p0"]), float(r["p1"])] for r in rows])
+-    steps = [int(r["step"]) for r in rows]
+-
+-    assert saver.n_saved == len(rows) > 5
+-    assert all(float(r["worst_sigma"]) < 1.5 for r in rows)  # all fit
+-    assert min(steps) > 100  # nothing from the burn-in
+-    assert steps == sorted(steps)
+-
+-    # Distinct: the posterior is a unit Gaussian, so a distance of 0.5 sigma
+-    # is about 0.5 in these units (the scale is the chain's own spread).
+-    distances = np.sqrt(
+-        np.mean((params[:, None, :] - params[None, :, :]) ** 2, axis=-1)
+-    )
+-    np.fill_diagonal(distances, np.inf)
+-    assert distances.min() > 0.25
+-
+-
+-def test_fits_are_saved_at_several_checks(tmp_path):
+-    run_synthetic(tmp_path / "fits")
+-    steps = {int(r["step"]) for r in read_index(tmp_path / "fits")}
+-    assert len(steps) >= 2  # models arrive while the chain is running
+-
+-
+-def test_larger_min_distance_saves_fewer_models(tmp_path):
+-    loose, _ = run_synthetic(tmp_path / "a", min_distance=0.0)
+-    medium, _ = run_synthetic(tmp_path / "b", min_distance=0.5)
+-    strict, _ = run_synthetic(tmp_path / "c", min_distance=2.0)
+-    assert strict.n_saved < medium.n_saved < loose.n_saved
+-    assert strict.n_saved >= 1
+-
+-
+-def test_models_that_do_not_fit_are_not_saved(tmp_path):
+-    saver, _ = run_synthetic(tmp_path / "fits", n_sigma=1e-6)
+-    assert saver.n_saved == 0
+-    assert not (tmp_path / "fits" / "index.csv").exists()
+-
+-
+-def test_max_models_stops_the_run(tmp_path):
+-    saver, (sampler, _, _, _, stopped) = run_synthetic(
+-        tmp_path / "fits", min_distance=0.0, max_models=3
+-    )
+-    assert saver.n_saved == 3
+-    assert stopped
+-    assert sampler.iteration < 400
+-
+-
+-def test_models_already_on_disk_count_and_are_not_repeated(tmp_path):
+-    directory = tmp_path / "fits"
+-    run_synthetic(directory, min_distance=0.0, max_models=3)
+-    before = read_index(directory)
+-    assert len(before) == 3
+-
+-    # The same chain again finds the same fits, but the quota is full:
+-    again, _ = run_synthetic(directory, min_distance=0.0, max_models=3)
+-    assert read_index(directory) == before
+-    assert again.n_saved == 3
+-
+-    # With a larger quota only new models are added; numbering goes on:
+-    run_synthetic(directory, min_distance=0.0, max_models=6)
+-    rows = read_index(directory)
+-    assert len(rows) == 6
+-    assert len({r["name"] for r in rows}) == 6
+-    assert len({(r["p0"], r["p1"]) for r in rows}) == 6
+-
+-
+-def test_models_that_fail_to_save_are_not_counted(tmp_path):
+-    saver = FitSaver(SaveFits(tmp_path, burn_in=0, min_distance=0.0), 2)
+-    run_sampler(
+-        gaussian,
+-        [CENTER],
+-        start_positions(),
+-        100,
+-        ConvergenceCriteria(check_every=100),
+-        callback=lambda s, d: saver.update(s, d, lambda job: None, None, 0),
+-    )
+-    assert saver.n_saved == 0  # every re-evaluation "failed"
+-
+-
+-# ---------------------------------------------------- the real ToF model
+-
+-
+-def make_tof(**options):
+-    reference = jupiter_polytrope(4, 16)
+-    target = reference.Js[1:3]
+-    X = ClassToF.ToF(
+-        N=16,
+-        order=4,
+-        R_ref=R_JUPITER,
+-        baro_param_init=[1.0],
+-        target_Js=target,
+-        sigma_Js=0.05 * np.abs(target),
+-        dJ_tol=1e-4,
+-        drot_tol=1e-4,
+-        drho_tol=1e-4,
+-        **options,
+-    )
+-    X.set_barotrope(_barotrope_K)
+-    X.set_check_param(_is_not_positive)
+-    return X
+-
+-
+-FAST = ConvergenceCriteria(check_every=20)
+-
+-
+-@pytest.fixture(scope="module")
+-def real_run(tmp_path_factory):
+-    """One small run on the real model that saves its fits."""
+-
+-    directory = tmp_path_factory.mktemp("fits")
+-    # The Js of this model hardly depend on K, so every sample fits.
+-    save = SaveFits(directory, n_sigma=3.0, min_distance=0.0, burn_in=20)
+-    X = make_tof()
+-    result = X.run_mcmc(
+-        "baro", 2, 60, seed=3, convergence=FAST, save_fits=save
+-    )
+-    return X, directory, result
+-
+-
+-def test_run_mcmc_returns_a_complete_result(real_run):
+-    X, _, result = real_run
+-    assert isinstance(result, MCMCResult)
+-    assert result.chain.shape == (60, 2, 1)
+-    assert result.log_prob.shape == (60, 2)
+-    assert result.blobs.shape == (60, 2)
+-    np.testing.assert_array_equal(result.state, result.chain[-1])
+-    assert len(result.autocorr) == 3  # checks at steps 20, 40 and 60
+-    assert result.history.shape == (3, 5)
+-    assert result.failed_checks == [
+-        name for name, ok in result.diagnostics["checks"].items() if not ok
+-    ]
+-
+-
+-def test_blobs_are_the_worst_deviation_in_sigma(real_run):
+-    X, _, result = real_run
+-    param = result.chain[-1, 0]
+-    costJs = X.baro_cost_function(param, return_sum=False)
+-    assert result.blobs[-1, 0] == pytest.approx(np.sqrt(np.max(-costJs)))
+-
+-
+-def test_real_fits_are_saved_as_files_with_an_index(real_run):
+-    X, directory, result = real_run
+-    rows = read_index(directory)
+-
+-    assert result.n_fits_saved == len(rows) > 0
+-    assert result.save_directory == str(directory)
+-    assert len({r["p0"] for r in rows}) == len(rows)  # no repeats
+-
+-    for row in rows:
+-        index = row["name"].split("_")[-1]
+-        data = np.loadtxt(directory / f"model_SI_{index}.txt")
+-        assert data.shape == (16, 3)  # radii, densities, pressures
+-        assert np.all(np.diff(data[:, 0]) < 0)  # from the surface inwards
+-        assert np.all(np.diff(data[:, 1]) >= 0)  # density grows inwards
+-        assert np.all(np.diff(data[:, 2]) >= 0)  # pressure grows inwards
+-        assert float(row["worst_sigma"]) < 3.0
+-        assert int(row["step"]) > 20  # nothing from the burn-in
+-
+-
+-def test_saved_real_models_reproduce_their_fit(real_run):
+-    X, directory, _ = real_run
+-    for row in read_index(directory)[:3]:
+-        costJs = X.baro_cost_function(
+-            np.array([float(row["p0"])]), return_sum=False
+-        )
+-        assert np.sqrt(np.max(-costJs)) == pytest.approx(
+-            float(row["worst_sigma"]), rel=1e-3, abs=1e-6
+-        )
+-
+-
+-def test_result_can_be_saved(real_run, tmp_path):
+-    _, _, result = real_run
+-    result.save(tmp_path / "chain.npz")
+-    np.testing.assert_array_equal(
+-        np.load(tmp_path / "chain.npz")["chain"], result.chain
+-    )
+-
+-
+-def test_cgs_profile_units(tmp_path):
+-    X = jupiter_polytrope(4, 16)
+-    _write_profile(X, str(tmp_path / "m"), True, 7)
+-    data = np.loadtxt(tmp_path / "m_CGS_7.txt")
+-    np.testing.assert_allclose(data[:, 0], X.li * 100)
+-    np.testing.assert_allclose(data[:, 1], np.log10(X.rhoi) - 3)
+-    np.testing.assert_allclose(data[:, 2], np.log10(X.Pi) + 1)
+-
+-
+-def test_seeded_runs_are_reproducible_and_the_old_interface_agrees():
+-    a = make_tof().run_mcmc("baro", 2, 10, seed=7)
+-    b = make_tof().run_mcmc("baro", 2, 10, seed=8)
+-    state, autocorr = make_tof().run_baro_MC(2, 10, seed=7)  # old interface
+-
+-    np.testing.assert_array_equal(state, a.state)
+-    np.testing.assert_array_equal(autocorr, a.autocorr)
+-    assert not np.array_equal(a.chain, b.chain)
+-
+-
+-def test_saving_works_with_parallel_walkers(tmp_path):
+-    result = make_tof().run_mcmc(
+-        "baro",
+-        2,
+-        20,
+-        Ncores=2,
+-        parallelize=True,
+-        seed=3,
+-        convergence=ConvergenceCriteria(check_every=10),
+-        save_fits=SaveFits(tmp_path, n_sigma=3.0, min_distance=0.0, burn_in=0),
+-    )
+-    assert result.n_fits_saved > 0
+-    assert len(read_index(tmp_path)) == result.n_fits_saved
+-
+-
+-def test_progress_is_reported_at_verbosity_one(capsys):
+-    X = make_tof(verbosity=1)
+-    X.run_mcmc("baro", 2, 20, seed=1, convergence=ConvergenceCriteria(10))
+-    out = capsys.readouterr().out
+-    assert "[MCMC] step 10" in out and "[MCMC] step 20" in out
+-    assert "Generated initial conditions for walker number: 1" in out
+-
+-
+-# ------------------------------------------------------------- robustness
+-
+-
+-def test_impossible_starting_points_raise_instead_of_hanging():
+-    X = make_tof()
+-    X.set_check_param(lambda param: True)
+-    with pytest.raises(RuntimeError, match="No physical starting point"):
+-        X.run_mcmc("baro", 2, 20, max_start_attempts=5)
+-
+-
+-def test_too_few_walkers():
+-    with pytest.raises(ValueError, match="twice as many walkers"):
+-        make_tof().run_mcmc("baro", 1, 20)
+-
+-
+-def test_missing_settings_are_explained():
+-    X = ClassToF.ToF(N=16, order=4, R_ref=R_JUPITER)
+-    X.set_barotrope(_barotrope_K)
+-    with pytest.raises(ValueError, match="baro_param_init"):
+-        X.run_mcmc("baro", 2, 20)
+-
+-    X = ClassToF.ToF(N=16, order=4, R_ref=R_JUPITER, baro_param_init=[1.0])
+-    with pytest.raises(ValueError, match="set_check_param"):
+-        X.run_mcmc("baro", 2, 20)
+-
+-
+-def test_unknown_model_name():
+-    with pytest.raises(KeyError, match="baro"):
+-        make_tof().run_mcmc("nonsense", 2, 20)
+-
+-
+-def test_unpicklable_functions_are_explained_before_starting_a_pool():
+-    X = make_tof()
+-    X.set_barotrope(lambda P, K: np.sqrt(P / K))
+-    with pytest.raises(TypeError, match="cannot be pickled"):
+-        X.run_mcmc("baro", 2, 20, parallelize=True)
+-
+-
+-def test_importing_pytof_does_not_change_the_multiprocessing_start_method():
+-    import subprocess
+-    import sys
+-
+-    code = (
+-        "import multiprocessing as m; before = m.get_start_method(); "
+-        "import PyToF; assert m.get_start_method() == before, 'changed'"
+-    )
+-    subprocess.run([sys.executable, "-c", code], check=True)
+-
+-
+-# -------------------------------------------------------------- checkpoint
+-
+-
+-def test_chain_can_be_resumed_from_a_checkpoint(tmp_path):
+-    pytest.importorskip("h5py")
+-    path = tmp_path / "chain.h5"
+-
+-    first = make_tof().run_mcmc(
+-        "baro", 2, 20, seed=5, convergence=FAST, checkpoint=path
+-    )
+-    assert first.chain.shape[0] == 20
+-
+-    resumed = make_tof().run_mcmc(
+-        "baro", 2, 40, seed=99, convergence=FAST, checkpoint=path
+-    )
+-    assert resumed.chain.shape[0] == 40
+-    np.testing.assert_array_equal(resumed.chain[:20], first.chain)
+-
+-    # ... and it is the chain an uninterrupted run would have produced:
+-    straight = make_tof().run_mcmc("baro", 2, 40, seed=5, convergence=FAST)
+-    np.testing.assert_allclose(resumed.chain, straight.chain, rtol=1e-12)
+-
+-
+-def test_checkpoint_of_a_different_shape_is_not_resumed(tmp_path):
+-    pytest.importorskip("h5py")
+-    path = tmp_path / "chain.h5"
+-    make_tof().run_mcmc("baro", 2, 10, seed=5, checkpoint=path)
+-    other = make_tof().run_mcmc("baro", 4, 10, seed=5, checkpoint=path)
+-    assert other.chain.shape == (10, 4, 1)  # started afresh
+-
+-
+-def test_missing_h5py_is_explained(tmp_path, monkeypatch):
+-    import builtins
+-
+-    real_import = builtins.__import__
+-
+-    def refuse_h5py(name, *args, **kwargs):
+-        if name == "h5py":
+-            raise ImportError("no h5py")
+-        return real_import(name, *args, **kwargs)
+-
+-    monkeypatch.setattr(builtins, "__import__", refuse_h5py)
+-    with pytest.raises(ImportError, match="pip install h5py"):
+-        make_tof().run_mcmc("baro", 2, 10, checkpoint=tmp_path / "x.h5")
+diff --git a/tests/test_smoke.py b/tests/test_smoke.py
+deleted file mode 100644
+index 13fc4ea..0000000
+--- a/tests/test_smoke.py
++++ /dev/null
+@@ -1,51 +0,0 @@
+-"""Run the MCMC entry points end to end on tiny problems."""
+-
+-import numpy as np
+-import pytest
+-
+-from PyToF import ClassToF
+-
+-
+-def _barotrope(P, K):
+-    return np.sqrt(P / K)
+-
+-
+-def _check_param(param):
+-    return bool(np.any(np.asarray(param) <= 0))
+-
+-
+-@pytest.fixture
+-def mc_model():
+-    X = ClassToF.ToF(
+-        N=64,
+-        order=4,
+-        R_ref=71492000,
+-        baro_param_init=[1.0],
+-        target_Js=np.array([1.3988e-2, -5.318e-4]),
+-        sigma_Js=np.array([1e-4, 1e-5]),
+-    )
+-    X.set_barotrope(_barotrope)
+-    X.set_check_param(_check_param)
+-    return X
+-
+-
+-def test_baro_mcmc_runs_serial(mc_model):
+-    np.random.seed(0)
+-    state, autocorr = mc_model.run_baro_MC(6, 5, parallelize=False)
+-    assert state.shape == (6, 1)
+-    assert np.all(np.isfinite(state))
+-    assert np.all(state > 0)
+-
+-
+-def test_classify_and_save_state(mc_model):
+-    np.random.seed(0)
+-    state, _ = mc_model.run_baro_MC(6, 5, parallelize=False)
+-    matches, rho_max = mc_model.classify_and_save_state(state, "baro")
+-    assert matches.shape == (6,)
+-    assert rho_max.shape == (6,)
+-
+-
+-def test_baro_mcmc_runs_parallel(mc_model):
+-    np.random.seed(0)
+-    state, _ = mc_model.run_baro_MC(6, 5, Ncores=2, parallelize=True)
+-    assert state.shape == (6, 1)
