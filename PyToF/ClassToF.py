@@ -69,8 +69,10 @@ class ToF:
     def reset(self):
         """
         Resets all results to the initial conditions given by the options, so
-        that a new relaxation starts from scratch. Does not touch the options
-        and does not undo a fallback from Simpson's rule (simpson_in_use).
+        that a new relaxation starts from scratch. Does not touch the options.
+        A fallback from Simpson's rule to the trapezoid rule (simpson_in_use)
+        is undone, so the result of a calculation does not depend on the
+        models calculated before with the same object.
 
         Sets...
 
@@ -96,6 +98,7 @@ class ToF:
                             outermost mean surface layer
         - R_po_to_R_m:      Float, ratio of the polar radius to the to
                             outermost mean surface layer
+        - simpson_in_use:   True again if use_simpson is True (see above)
         - baro_param_calc:  Possibly updated parameters used by the barotrope
                             function set via set_barotrope()
         - atmosphere_index: Integer, defines the index of atmosphere transition
@@ -115,6 +118,7 @@ class ToF:
                 * scipy.integrate.simpson(rho_pre * self.li**2, x=self.li)
             )
         )
+        self._simpson_failed = False
         self.Pi = np.zeros(self.opts["N"])
         self.Js = np.hstack((-1, np.zeros(self.opts["order"])))
         self.Js_errors = np.hstack(
@@ -158,11 +162,6 @@ class ToF:
                 "R_ref = R_phys.",
                 kind="warn",
             )
-
-        # PyToF switches to the trapezoid rule if Simpson's rule turns out to
-        # be unstable. This is a result of the calculation, not an option, and
-        # it persists between calls (it is deliberately not part of reset):
-        self._simpson_failed = False
 
         # Set initial conditions:
         self.reset()

@@ -37,3 +37,28 @@ def test_matches_golden(name):
             atol=1e-30,
             err_msg=f"{name}: {key}",
         )
+
+
+def test_reset_undoes_simpson_fallback():
+    """A density jump makes PyToF fall back to the trapezoid rule; reset()
+    must undo that so that the next model does not depend on the last one."""
+    import numpy as np
+
+    from PyToF import ClassToF
+    from tests.cases import R_JUPITER, jupiter_polytrope
+
+    def jump(P, param=None):
+        return np.sqrt(P) * (1 + 1.0 * (P > 0.3 * np.max(P)))
+
+    X = ClassToF.ToF(N=256, R_ref=R_JUPITER)
+    X.set_barotrope(jump)
+    X.relax_to_barotrope()
+    assert not X.simpson_in_use
+
+    X.reset()
+    assert X.simpson_in_use
+    X.set_barotrope(lambda P, param=None: np.sqrt(P))
+    X.relax_to_barotrope()
+    fresh = jupiter_polytrope(4, 256)
+    assert X.simpson_in_use
+    np.testing.assert_allclose(X.Js, fresh.Js, rtol=1e-12)

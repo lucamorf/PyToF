@@ -55,3 +55,8 @@ Jupiter-like n=1 polytrope, `relax_to_barotrope()`, 20-core WSL machine, scripts
 4. Order 10 only: the polynomial blocks (70%). Hypotheses, untested: common-subexpression elimination in the generator, fused evaluation (numexpr), or numba. Large effort for a niche case.
 5. Convergence acceleration (Anderson) of the outer loop: untested hypothesis, potentially 2x; most invasive.
 6. Small stuff: ~8% of the order-4 time is `dataclasses.fields` called by `Options` access in the inner loops (cache the dict).
+
+## STATUS (your decisions)
+- `reset()` now undoes the Simpson fallback (`_simpson_failed = False` moved into it; test `test_reset_undoes_simpson_fallback`). 99 tests pass, golden numbers unchanged.
+- Steep smooth profiles: left as they are (no extra safeguard). Tolerances: keep 1e-10 as default. Check at N=16384 vs Bessel: order 10 J2..J6 agree to 2e-9..4e-9, order 7 J2 to 2e-9, so 1e-10 is about one order below the best attainable accuracy; no change.
+- Speed: considered fine for now; no further changes.
