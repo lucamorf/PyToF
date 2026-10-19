@@ -5,31 +5,27 @@ Keeping them in one place guarantees that the golden-master file and the
 regression test always describe exactly the same calculation.
 """
 
+import importlib.util
+from pathlib import Path
+
 import numpy as np
 from scipy.integrate import trapezoid
 
 from PyToF import ClassToF
 
-R_JUPITER = 71492000.0
-
-# Wisdom & Hubbard (2016), Icarus 267, 315, doi:10.1016/j.icarus.2015.12.030:
+# Literature reference values live in accuracy/references.py, shared with the
+# accuracy notebooks (so notebooks and tests cannot disagree). Wisdom &
+# Hubbard (2016), Icarus 267, 315, doi:10.1016/j.icarus.2015.12.030:
 # closed-form (Bessel function) solution for a rotating n=1 polytrope with
 # P = rho^2, order of entries: [R_eq/R_m, J2, J4, ..., J20].
-WH16_BESSEL = np.array(
-    [
-        1.022875431133174e0,
-        1.398851089834702e-2,
-        -5.318281001092907e-4,
-        3.011832290533641e-5,
-        -2.132115710725050e-6,
-        1.740671195871128e-7,
-        -1.568219505602588e-8,
-        1.518099230068580e-9,
-        -1.551985393081485e-10,
-        1.655948019619652e-11,
-        -1.829544870258362e-12,
-    ]
+_spec = importlib.util.spec_from_file_location(
+    "pytof_references",
+    Path(__file__).resolve().parents[1] / "accuracy" / "references.py",
 )
+references = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(references)
+WH16_BESSEL = references.Bessel
+R_JUPITER = references.JUPITER_RADIUS
 
 
 def polytrope_n1(P, param=None):
@@ -71,26 +67,12 @@ def uniform_sphere(
 # Golden-master cases. Each entry builds a relaxed ToF object.
 # ----------------------------------------------------------------------
 
-# Differential-rotation coefficients of Wisdom & Hubbard (2016), in m^2 s^-2,
-# as used in PyToF_Accuracy_and_Convergence.ipynb:
-ALPHAS_WH16 = np.zeros(12)
-ALPHAS_WH16[:4] = (
-    np.array(
-        [
-            -5.8954166431924311100e-2,
-            4.6123389620922838894e-1,
-            -1.0426642770099761037e0,
-            8.3030636453130002295e-1,
-        ]
-    )
-    * 1e6
-)
+# Differential-rotation coefficients of Wisdom & Hubbard (2016), in m^2 s^-2:
+ALPHAS_WH16 = references.alphas_array(references.ALPHAS_DR2)
 
 # Concentric Maclaurin Spheroid result with the differential rotation above
-# ("CMSDR2" in the accuracy notebook), W&H 2016: [J2, J4, J6]:
-WH16_CMS_DR2_J2_J4_J6 = np.array(
-    [1.399685529663848e-2, -5.358080750264726e-4, 3.159100841281628e-5]
-)
+# ("CMSDR2"), W&H 2016: [J2, J4, J6]:
+WH16_CMS_DR2_J2_J4_J6 = references.CMSDR2[1:4]
 
 
 def _atmosphere(norm_radii, pressure, K=1e2):

@@ -37,7 +37,7 @@ def test_nonrotating_body_has_no_gravitational_harmonics():
 
 def test_rotating_uniform_spheroid_nmoi_matches_shape_formula():
     # For a constant-density spheroid the NMoI is 2/5 times (R_eq/R_m)^2,
-    # exactly the comparison used in PyToF_Accuracy_and_Convergence.ipynb.
+    # exactly the comparison used in accuracy/accuracy_quick.ipynb.
     X = uniform_sphere(N=1024, period=24 * 3600)
     expected = 2 / 5 * X.R_eq_to_R_m**2
     assert X.get_NMoI() == pytest.approx(expected, rel=1e-7)

@@ -264,9 +264,12 @@ def _warn_not_converged(tof, drot, dJs, drho, max_iter_name):
 
 def get_Js_errors(self):
     """
-    This function is called by relax_to_shape() and fills self.Js_errors
-    error estimates for the gravitational moments Js calculated by the Theory
-    of Figures based on the results from PyToF_Accuracy_and_Convergence.ipynb.
+    Fills self.Js_errors with error estimates for the gravitational moments
+    Js calculated by the Theory of Figures, based on the convergence study in
+    accuracy/accuracy_full.ipynb (tables PyToF/accuracy_data_*.npz). Not
+    called automatically: call it after relax_to_shape(), relax_to_barotrope()
+    or relax_to_density(). Not available with differential rotation or a
+    non-equidistant grid (warns instead).
     """
 
     if max(abs(self.opts["alphas"])) != 0:

@@ -22,6 +22,12 @@ from matplotlib.patches import Patch
 _LINESTYLES = ["-", "--", ":", "-."]
 
 
+def _normalized(y):
+    """y divided by its largest absolute value (y itself if that is zero)."""
+    scale = np.max(abs(y))
+    return y / scale if scale > 0 else y
+
+
 def _autosave_fig(fig, base_name):
     """Save ``fig`` as base_name_<i>.png with the first unused i; close it."""
     i = 0
@@ -87,7 +93,7 @@ def debug_FunctionsToF_plot(tof, what_x=0, new=True, iteration=0):
     for name, y in (("rho", tof.rhoi), ("P", tof.Pi)):
         ax = getattr(tof, f"bugfix_{name}_ax")
         fig = getattr(tof, f"bugfix_{name}_fig")
-        y = y / np.max(abs(y)) + offset * (k - 1)
+        y = _normalized(y) + offset * (k - 1)
         ax.plot(xs[what_x], y, color=f"C{k}")
         ax.annotate(str(k), (xs[what_x][0], y[0]))
         fig.savefig(
@@ -168,7 +174,7 @@ def _integral_figure(z, n_j, curves, names, base_name):
 def _integrand_figure(z, integrand, label, base_name):
     fig, ax = plt.subplots(layout="constrained")
     for j, y in enumerate(integrand):
-        ax.plot(z, y / np.max(abs(y)), label=label(j))
+        ax.plot(z, _normalized(y), label=label(j))
     ax.set_xlabel(r"$z$")
     ax.legend()
     _autosave_fig(fig, base_name)
