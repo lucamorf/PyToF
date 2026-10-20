@@ -99,8 +99,6 @@ class ToF:
         - R_po_to_R_m:      Float, ratio of the polar radius to the to
                             outermost mean surface layer
         - simpson_in_use:   True again if use_simpson is True (see above)
-        - baro_param_calc:  Possibly updated parameters used by the barotrope
-                            function set via set_barotrope()
         - atmosphere_index: Integer, defines the index of atmosphere transition
         """
 
@@ -140,7 +138,6 @@ class ToF:
         self.U = np.zeros(self.opts["N"])
         self.R_eq_to_R_m = 1.0
         self.R_po_to_R_m = 1.0
-        self.baro_param_calc = self.opts["baro_param_init"]
         self.atmosphere_index = 0
 
     def __init__(self, **kwargs):
@@ -185,6 +182,28 @@ class ToF:
             RenamedWarning,
         )
         self.reset()
+
+    @property
+    def baro_param_calc(self):
+        """Old name of opts["baro_param"]."""
+
+        warn(
+            "ToF.baro_param_calc was replaced by ToF.opts['baro_param']. The "
+            "old name still works but will be removed in a future version.",
+            RenamedWarning,
+            stacklevel=2,
+        )
+        return self.opts["baro_param"]
+
+    @baro_param_calc.setter
+    def baro_param_calc(self, value):
+        warn(
+            "ToF.baro_param_calc was replaced by ToF.opts['baro_param']. The "
+            "old name still works but will be removed in a future version.",
+            RenamedWarning,
+            stacklevel=2,
+        )
+        self.opts["baro_param"] = value
 
     Js_error = _renamed_attribute("Js_error", "Js_errors")
     ss = _renamed_attribute("ss", "figure_functions")

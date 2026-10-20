@@ -165,18 +165,14 @@ def _update_densities_barotrope(tof):
     """
     This function is called by relax_to_barotrope() and implements the
     barotrope model density = barotrope(pressure), i.e. tof.rhoi =
-    tof.barotrope(tof.Pi, tof.baro_param_calc).
+    tof.barotrope(tof.Pi, tof.opts["baro_param"]).
     """
 
     # Calculates the pressure values according to hydrostatic equilibrium:
     _pressurize(tof)
 
-    # Ensure that the barotrope has an argument in case it needs one:
-    if tof.baro_param_calc is None:
-        tof.baro_param_calc = tof.opts["baro_param_init"]
-
     # Set new densitites:
-    tof.rhoi = tof.barotrope(tof.Pi, tof.baro_param_calc)
+    tof.rhoi = tof.barotrope(tof.Pi, tof.opts["baro_param"])
 
     # Ensure physical mass stays unaffacted:
     _fixmass(tof)

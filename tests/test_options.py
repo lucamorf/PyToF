@@ -19,7 +19,7 @@ def test_defaults_are_the_wisdom_hubbard_jupiter():
     assert opts["order"] == 4
     assert opts["R_phys"] == [71492000, "equatorial"]
     assert opts["M_phys"] == 126686536.1 * (1000) ** 3 / 6.6738480e-11
-    assert opts["baro_param_init"] is None
+    assert opts["baro_param"] is None
     assert opts["alphas"].shape == (12,)
 
 
@@ -163,6 +163,7 @@ RENAMED = {
     "MaxIterUpdate": "max_iter_update",
     "MaxIterBar": "max_iter_barotrope",
     "MaxIterDen": "max_iter_density",
+    "baro_param_init": "baro_param",
 }
 
 
@@ -268,3 +269,24 @@ def test_figure_functions_and_volume_integrals_are_filled_by_relaxing():
     for quantity in (X.figure_functions, X.volume_integrals):
         assert all(len(entry) == 64 for entry in quantity)
     assert np.any(X.figure_functions[1] != 0)
+
+
+def test_baro_param_calc_is_an_alias_of_the_option():
+    X = ClassToF.ToF(N=32, baro_param=[2.0])
+
+    with pytest.warns(RenamedWarning, match="baro_param") as record:
+        value = X.baro_param_calc
+    assert record[0].filename == __file__
+    assert value == [2.0]
+
+    with pytest.warns(RenamedWarning):
+        X.baro_param_calc = [3.0]
+    assert X.opts["baro_param"] == [3.0]
+
+
+def test_barotrope_parameter_set_after_construction_is_used():
+    X = ClassToF.ToF(N=32, R_ref=71492000)
+    X.opts["baro_param"] = [1.0]
+    X.set_barotrope(lambda P, K: (P / K[0]) ** 0.5)
+    X.relax_to_barotrope()
+    assert np.all(np.isfinite(X.Js))

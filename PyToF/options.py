@@ -49,6 +49,7 @@ RENAMED = {
     "MaxIterUpdate": "max_iter_update",
     "MaxIterBar": "max_iter_barotrope",
     "MaxIterDen": "max_iter_density",
+    "baro_param_init": "baro_param",
 }
 
 RADIUS_KINDS = ("equatorial", "mean", "polar")
@@ -67,30 +68,30 @@ def _option(default, doc, group, factory=False):
 class Options:
     # ------------------------------------------------------------ numerics
     N: int = _option(
-        2**10, "Number of grid points (level surfaces).", "numerics"
+        2**10, "Number of grid points (called level surfaces in the Theory of Figures).", "numerics"
     )
     n_bin: int = _option(
         -1,
         "Number of bins for the figure functions; -1 or N means no binning, "
-        "smaller values are faster but less accurate.",
+        "positive values smaller than N are faster but less accurate.",
         "numerics",
     )
-    order: int = _option(4, "Theory of Figures order: 4, 7 or 10.", "numerics")
+    order: int = _option(4, "Theory of Figures order: 4, 7 or 10. Higher orders are slower and more accurate.", "numerics")
     use_simpson: bool = _option(
         True,
-        "Use Simpson's rule (otherwise the trapezoid rule) for the pressure "
-        "and AlgoToF integrals. PyToF falls back to the trapezoid rule on "
+        "PyToF uses Simpson's rule (otherwise the trapezoid rule) for internal"
+        "integral calculations if True. PyToF falls back to the trapezoid rule on "
         "its own if Simpson's rule becomes unstable, see ToF.simpson_in_use.",
         "numerics",
     )
     dJ_tol: float = _option(
-        1e-10, "Relative tolerance of the gravitational moments.", "numerics"
+        1e-10, "Relative tolerance of the gravitational moments to quantify convergence.", "numerics"
     )
     drot_tol: float = _option(
-        1e-10, "Relative tolerance of the rotational parameter.", "numerics"
+        1e-10, "Relative tolerance of the rotational parameter to quantify convergence.", "numerics"
     )
     drho_tol: float = _option(
-        1e-10, "Relative tolerance of the densities.", "numerics"
+        1e-10, "Relative tolerance of the densities to quantify convergence.", "numerics"
     )
     max_iter_shape: int = _option(
         100, "Maximum iterations of relax_to_shape().", "numerics"
@@ -120,12 +121,12 @@ class Options:
     # -------------------------------------------------------------- planet
     G: float = _option(_G, "Gravitational constant in SI units.", "planet")
     M_phys: float = _option(
-        _GM / _G, "Mass of the planet in SI units.", "planet"
+        _GM / _G, "Mass of the planet in SI units (Jupiter by default).", "planet"
     )
     R_phys: list = _option(
         lambda: [_RADIUS, "equatorial"],
         "Physical radius in SI units and its kind: [value, 'equatorial' | "
-        "'mean' | 'polar'].",
+        "'mean' | 'polar']  (Jupiter by default).",
         "planet",
         factory=True,
     )
@@ -141,7 +142,7 @@ class Options:
         / np.sqrt(
             (126686536.1 * (1000) ** 3 * _ROTATIONAL_PARAMETER) / (_RADIUS**3)
         ),
-        "Rotation period in SI units.",
+        "Rotation period in SI units (Jupiter by default).",
         "planet",
     )
     P0: float = _option(0, "Surface pressure in SI units.", "planet")
@@ -153,9 +154,10 @@ class Options:
         factory=True,
     )
     # --------------------------------------------------------------- model
-    baro_param_init: list = _option(
+    baro_param: list = _option(
         None,
-        "Parameters of the barotrope set via set_barotrope().",
+        "Parameters of the barotrope set via set_barotrope(): the barotrope "
+        "is called as f(P, baro_param).",
         "model",
     )
     use_atmosphere: bool = _option(

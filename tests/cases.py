@@ -130,7 +130,7 @@ def _atmosphere_case():
         use_atmosphere=True,
         atmosphere=_atmosphere,
         atmosphere_until=1e6,
-        baro_param_init=[1.0],
+        baro_param=[1.0],
     )
     X.set_barotrope(_barotrope_K)
     X.relax_to_barotrope()
