@@ -5,7 +5,7 @@
 import numpy as np
 import scipy
 
-from PyToF.messages import say
+from PyToF.messages import warn_simpson_fallback
 
 
 def default_opts():
@@ -447,13 +447,7 @@ def B9(fs, z, rho, rho_bar, opts):
 
     if opts["use_simpson"] and not np.allclose(np.diff(z), np.diff(z)[0]):
         opts["use_simpson"] = False
-        say(
-            opts["verbosity"],
-            1,
-            "Reverting to the more stable and less accurate trapezoid rule "
-            "for integration since the radius grid is non-uniform.",
-            kind="warn",
-        )
+        warn_simpson_fallback("the radius grid is non-uniform.")
 
     if opts["use_simpson"]:
         h = z[1] - z[0]
@@ -542,14 +536,10 @@ def B9(fs, z, rho, rho_bar, opts):
     if opts["use_simpson"] and not np.all(np.diff(new_SS[0]) <= 0):
         opts["use_simpson"] = False
 
-        say(
-            opts["verbosity"],
-            1,
-            "Reverting to the more stable and less accurate trapezoid rule "
-            "for integration since S_0, itself proportional to the enclosed "
-            "mass function, has become non-monotonic. Discontinuities in the "
-            "density gradient due to jumps in density are likely responsible.",
-            kind="warn",
+        warn_simpson_fallback(
+            "S_0, itself proportional to the enclosed mass function, has "
+            "become non-monotonic. Discontinuities in the density gradient "
+            "due to jumps in density are likely responsible."
         )
 
         return B9(fs, z, rho, rho_bar, opts)

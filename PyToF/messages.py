@@ -8,15 +8,23 @@ There are two kinds of messages:
   module, so they are always shown but can be silenced or turned into errors
   with ``warnings.simplefilter``, and ``pytest.warns`` can test for them.
 
+  Anything that can change the result belongs here, e.g. the fallback to the
+  trapezoid rule (:class:`AccuracyWarning`), never in a progress message.
+
 * Progress messages (:func:`say`). Shown only if the ToF option ``verbosity``
   is at least the level of the message:
 
-    1  notices: assumptions made, solver fallbacks, MCMC progress
-    2  diagnostics: timings of relax_to_barotrope/density, rejected candidates
-    3  timing of every single relax_to_shape call
+    1  summary: one line per relax_to_shape/barotrope/density call with the
+       number of iterations and the final convergence measures
+    2  details: timings, atmosphere transition index, boundary conditions of
+       the Love number calculation
+    3  trace: one line per iteration of the relaxation loops and every
+       renormalisation of radius and mass
 
-Messages are written as plain templates; every ``{field}`` is highlighted as a
-number, so no colour codes are needed at the call site::
+Messages are written as plain templates; the text keeps the terminal's colour
+and every numeric ``{field}`` is highlighted, integers (counts such as
+iterations) in a different colour than floats (results), so no colour codes
+are needed at the call site::
 
     say(verbosity, 2, "Relaxing to shape took {t:.2e} seconds.", t=elapsed)
 
@@ -28,24 +36,28 @@ Colours are used in terminals and Jupyter, not when output is redirected to a
 file. Set ``NO_COLOR`` to disable them or ``FORCE_COLOR`` to always use them.
 """
 
+import numbers
 import os
 import string
 import sys
 import warnings
 
 __all__ = [
+    "AccuracyWarning",
     "ConvergenceWarning",
     "PyToFWarning",
     "RenamedWarning",
     "paint",
     "say",
     "warn",
+    "warn_simpson_fallback",
 ]
 
 _RESET = "\033[0m"
-_NUMBER = "\033[96m"
+_NUMBER = "\033[96m"  # floats: results
+_COUNT = "\033[93m"  # integers: counts such as iterations
 _KINDS = {
-    "info": "\033[94m",
+    "info": "",  # plain text, only the numbers are highlighted
     "warn": "\033[91m",
     "good": "\033[92m",
 }
@@ -57,6 +69,10 @@ class PyToFWarning(UserWarning):
 
 class ConvergenceWarning(PyToFWarning):
     """An iterative procedure did not reach the requested tolerance."""
+
+
+class AccuracyWarning(PyToFWarning):
+    """The result is less accurate than requested, e.g. after a fallback."""
 
 
 class RenamedWarning(PyToFWarning, FutureWarning):
@@ -79,8 +95,9 @@ def _use_colour(stream):
 def format_message(template, colour=False, kind="info", **fields):
     """
     Fill ``template`` with ``fields`` (``str.format`` syntax). With
-    ``colour=True`` the text gets the colour of ``kind`` and the filled-in
-    fields are highlighted as numbers.
+    ``colour=True`` the text gets the colour of ``kind`` ("info" is the
+    terminal's own colour) and numeric fields are highlighted: integers
+    (counts) and other numbers (results) in different colours.
     """
 
     if not colour:
@@ -94,7 +111,14 @@ def format_message(template, colour=False, kind="info", **fields):
             value = string.Formatter().get_field(name, (), fields)[0]
             if conversion:
                 value = string.Formatter().convert_field(value, conversion)
-            parts.append(_NUMBER + format(value, spec or "") + base)
+            text = format(value, spec or "")
+            if isinstance(value, numbers.Integral) and not isinstance(
+                value, bool
+            ):
+                text = _COUNT + text + (base or _RESET)
+            elif isinstance(value, numbers.Real):
+                text = _NUMBER + text + (base or _RESET)
+            parts.append(text)
     parts.append(_RESET)
 
     return "".join(parts)
@@ -103,7 +127,7 @@ def format_message(template, colour=False, kind="info", **fields):
 def paint(text, kind="info"):
     """Return ``text`` in the colour of ``kind`` if colours are in use."""
 
-    if not _use_colour(sys.stdout):
+    if not _use_colour(sys.stdout) or not _KINDS[kind]:
         return text
 
     return _KINDS[kind] + text + _RESET
@@ -140,4 +164,19 @@ def warn(template, category=PyToFWarning, stacklevel=2, **fields):
         format_message(template, **fields),
         category,
         stacklevel=stacklevel + 1,
+    )
+
+
+def warn_simpson_fallback(reason):
+    """
+    Warn that PyToF gave up Simpson's rule for the trapezoid rule. ``reason``
+    completes the sentence "... because <reason>".
+    """
+
+    warn(
+        "Reverting to the more stable and less accurate trapezoid rule for "
+        "integration because {reason}",
+        AccuracyWarning,
+        stacklevel=2,
+        reason=reason,
     )

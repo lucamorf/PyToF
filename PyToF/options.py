@@ -18,6 +18,7 @@ on the ToF object, never here.
 
 import copy
 import difflib
+import re
 from dataclasses import MISSING, dataclass, field, fields
 
 import numpy as np
@@ -45,10 +46,14 @@ _JS = [
 
 # Options that were renamed. The old names keep working but warn.
 RENAMED = {
-    "MaxIterShape": "max_iter_shape",
-    "MaxIterUpdate": "max_iter_update",
-    "MaxIterBar": "max_iter_barotrope",
-    "MaxIterDen": "max_iter_density",
+    "MaxIterShape": "max_iter_relax_shape",
+    "MaxIterUpdate": "max_iter_density_update",
+    "MaxIterBar": "max_iter_relax_barotrope",
+    "MaxIterDen": "max_iter_relax_density",
+    "max_iter_shape": "max_iter_relax_shape",
+    "max_iter_update": "max_iter_density_update",
+    "max_iter_barotrope": "max_iter_relax_barotrope",
+    "max_iter_density": "max_iter_relax_density",
     "baro_param_init": "baro_param",
 }
 
@@ -68,7 +73,11 @@ def _option(default, doc, group, factory=False):
 class Options:
     # ------------------------------------------------------------ numerics
     N: int = _option(
-        2**10, "Number of grid points (called level surfaces in the Theory of Figures).", "numerics"
+        2**10,
+        "Number of level surfaces, i.e. grid points: the nested surfaces of "
+        "constant density into which the planet is divided, each labelled by "
+        "its mean radius (ToF.li).",
+        "numerics",
     )
     n_bin: int = _option(
         -1,
@@ -79,7 +88,7 @@ class Options:
     order: int = _option(4, "Theory of Figures order: 4, 7 or 10. Higher orders are slower and more accurate.", "numerics")
     use_simpson: bool = _option(
         True,
-        "PyToF uses Simpson's rule (otherwise the trapezoid rule) for internal"
+        "PyToF uses Simpson's rule (otherwise the trapezoid rule) for internal "
         "integral calculations if True. PyToF falls back to the trapezoid rule on "
         "its own if Simpson's rule becomes unstable, see ToF.simpson_in_use.",
         "numerics",
@@ -93,26 +102,44 @@ class Options:
     drho_tol: float = _option(
         1e-10, "Relative tolerance of the densities to quantify convergence.", "numerics"
     )
-    max_iter_shape: int = _option(
-        100, "Maximum iterations of relax_to_shape().", "numerics"
-    )
-    max_iter_update: int = _option(
+    max_iter_relax_shape: int = _option(
         100,
-        "Maximum iterations of the density update (barotrope, atmosphere) "
-        "within one step of relax_to_barotrope()/relax_to_density().",
+        "Maximum number of iterations of relax_to_shape(). One iteration is "
+        "one full pass of the Theory of Figures algorithm. ",
         "numerics",
     )
-    max_iter_barotrope: int = _option(
-        100, "Maximum iterations of relax_to_barotrope().", "numerics"
+    max_iter_relax_barotrope: int = _option(
+        100,
+        "Maximum number of iterations of relax_to_barotrope(). Each iteration "
+        "includes up to two passes of the Theory of Figures algorithm and up "
+        "to max_iter_density_update density updates. Must be an integer >= 2.",
+        "numerics",
     )
-    max_iter_density: int = _option(
-        100, "Maximum iterations of relax_to_density().", "numerics"
+    max_iter_relax_density: int = _option(
+        100,
+        "Maximum number of iterations of relax_to_density(). Each iteration "
+        "includes up to two passes of the Theory of Figures algorithm and up "
+        "to max_iter_density_update density updates. Must be an integer "
+        ">= 2.",
+        "numerics",
+    )
+    max_iter_density_update: int = _option(
+        100,
+        "Maximum number of iterations of the inner density update that runs "
+        "once per iteration of relax_to_barotrope() and relax_to_density(). "
+        "It repeats the update of the densities (relevant if a barotrope or "
+        "an atmosphere model are supplied) until they change by less than "
+        "drho_tol. Must be an integer >= 2.",
+        "numerics",
     )
     # -------------------------------------------------------------- output
     verbosity: int = _option(
         0,
-        "0: quiet (warnings are always issued); 1: notices; 2: timings and "
-        "diagnostics; 3: timing of every shape relaxation.",
+        "How much PyToF prints; warnings are always issued. 0: quiet; "
+        "1: one summary line per iteration; 2: also timings, the atmosphere "
+        "transition and the boundary conditions of the Love number "
+        "calculation; 3: also one line per iteration and every "
+        "renormalization of radius and mass.",
         "output",
     )
     debug_plot: bool = _option(
@@ -121,7 +148,9 @@ class Options:
     # -------------------------------------------------------------- planet
     G: float = _option(_G, "Gravitational constant in SI units.", "planet")
     M_phys: float = _option(
-        _GM / _G, "Mass of the planet in SI units (Jupiter by default).", "planet"
+        _GM / _G,
+        "Mass of the planet in SI units (Jupiter by default).",
+        "planet",
     )
     R_phys: list = _option(
         lambda: [_RADIUS, "equatorial"],
@@ -154,10 +183,10 @@ class Options:
         factory=True,
     )
     # --------------------------------------------------------------- model
-    baro_param: list = _option(
+    baro_param: object = _option(
         None,
         "Parameters of the barotrope set via set_barotrope(): the barotrope "
-        "is called as f(P, baro_param).",
+        "is called as f(P, baro_param). Any object, e.g. a number or a list.",
         "model",
     )
     use_atmosphere: bool = _option(
@@ -269,16 +298,16 @@ class Options:
             raise ValueError(f"{name} must be an integer >= 2, not {value!r}.")
 
     @classmethod
-    def _validate_max_iter_update(cls, value):
-        cls._validate_max_iteration_count("max_iter_update", value)
+    def _validate_max_iter_density_update(cls, value):
+        cls._validate_max_iteration_count("max_iter_density_update", value)
 
     @classmethod
-    def _validate_max_iter_barotrope(cls, value):
-        cls._validate_max_iteration_count("max_iter_barotrope", value)
+    def _validate_max_iter_relax_barotrope(cls, value):
+        cls._validate_max_iteration_count("max_iter_relax_barotrope", value)
 
     @classmethod
-    def _validate_max_iter_density(cls, value):
-        cls._validate_max_iteration_count("max_iter_density", value)
+    def _validate_max_iter_relax_density(cls, value):
+        cls._validate_max_iteration_count("max_iter_relax_density", value)
 
     @staticmethod
     def _validate_verbosity(value):
@@ -320,7 +349,22 @@ class Options:
     # ---------------------------------------------------------- documentation
     @classmethod
     def describe(cls):
-        """All options as a Markdown table (for the README)."""
+        """
+        All options as a Markdown table (for the README). Meant to be shown
+        with ``IPython.display.Markdown(Options.describe())``.
+        """
+
+        def cell(text):
+            # A pipe would start a new column; line breaks would end the row.
+            return " ".join(str(text).split()).replace("|", "\\|")
+
+        def doc_cell(text):
+            # Show identifiers (names with an underscore or a dot, calls like
+            # relax_to_shape()) as code so that Markdown cannot misread them.
+            text = re.sub(
+                r"\b\w+(?:[._]\w+)+(?:\(\))?|\b\w+\(\)", r"`\g<0>`", text
+            )
+            return cell(text)
 
         rows = [
             "| group | option | default | description |",
@@ -333,10 +377,16 @@ class Options:
             if isinstance(default, np.ndarray):
                 text = f"array of length {len(default)}"
             else:
+                if isinstance(default, np.generic):
+                    default = default.item()
                 text = repr(default)
+            if len(text) > 40:
+                text = text[:37] + "..."
+            # Backticks may not contain a backtick themselves.
+            default_cell = "`" + cell(text).replace("`", "'") + "`"
             rows.append(
-                f"| {f.metadata['group']} | `{f.name}` | {text[:40]} | "
-                f"{f.metadata['doc']} |"
+                f"| {f.metadata['group']} | `{f.name}` | {default_cell} | "
+                f"{doc_cell(f.metadata['doc'])} |"
             )
 
         return "\n".join(rows)

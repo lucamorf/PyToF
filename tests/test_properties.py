@@ -110,3 +110,46 @@ def test_public_api_surface():
         "opts",
     ]:
         assert hasattr(X, name), name
+
+
+def test_potential_is_positive_and_pressure_follows_dP_equals_rho_dU():
+    X = jupiter_polytrope(4, N=256)
+    # Positive potential (+GM/r for a point mass) that grows towards the
+    # centre, so the gravitational acceleration -dU/dl is positive:
+    assert np.all(X.U > 0)
+    assert np.all(np.diff(X.U) > 0)  # li runs from the outside inwards
+    assert np.all(-np.gradient(X.U, X.li) > 0)
+    # Order of magnitude: close to GM/R at the surface (the centrifugal part
+    # makes the total potential of a fast rotator a bit larger):
+    GM = X.opts["G"] * X.opts["M_phys"]
+    assert 0.9 < X.U[0] / (GM / X.li[0]) < 1.2
+    # dP = rho dU (compared at the outer half, where P is small enough to
+    # compare differences):
+    dP = np.diff(X.Pi)
+    rho_dU = 0.5 * (X.rhoi[1:] + X.rhoi[:-1]) * np.diff(X.U)
+    np.testing.assert_allclose(dP[:100], rho_dU[:100], rtol=2e-2)
+    # The potential on the level surfaces does not depend on mu:
+    U_l_mu = X.get_U_l_mu(np.linspace(0, 1, 5))
+    np.testing.assert_allclose(
+        U_l_mu, np.outer(X.U, np.ones(5)), rtol=1e-12
+    )
+
+
+def test_all_per_level_surface_arrays_run_from_the_outside_inwards():
+    X = jupiter_polytrope(7, N=128)
+    for quantity in [X.li, X.rhoi, X.Pi, X.U, X.A0]:
+        assert len(quantity) == 128
+    for quantity in list(X.figure_functions) + list(X.volume_integrals):
+        assert len(quantity) == 128
+    assert X.li[0] > X.li[-1]
+    assert X.Pi[0] < X.Pi[-1]  # no pressure at the surface
+
+    # The shape of the outermost level surface, assembled from the figure
+    # functions at index 0, reproduces R_eq / R_m and R_po / R_m:
+    r = X.get_r_l_mu(np.array([0.0, 1.0]))  # equator, pole
+    np.testing.assert_allclose(r[0, 0] / X.li[0], X.R_eq_to_R_m, rtol=1e-12)
+    np.testing.assert_allclose(r[0, 1] / X.li[0], X.R_po_to_R_m, rtol=1e-12)
+    # ... and the figure functions of the outermost surface are the largest
+    # in size of the first (quadrupole) one:
+    s2 = X.figure_functions[1]
+    assert abs(s2[0]) > abs(s2[-1])

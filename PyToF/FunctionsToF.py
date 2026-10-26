@@ -9,7 +9,14 @@ import numpy as np
 import scipy
 
 import PyToF.AlgoToF as AlgoToF
-from PyToF.messages import ConvergenceWarning, PyToFWarning, say, warn
+from PyToF.messages import (
+    AccuracyWarning,
+    ConvergenceWarning,
+    PyToFWarning,
+    say,
+    warn,
+    warn_simpson_fallback,
+)
 
 
 def _mass_int(tof):
@@ -97,12 +104,34 @@ def _ensure_consistency(tof):
     tof.opts['M_phys'].
     """
 
+    trace = tof.opts["verbosity"] >= 3
+    if trace:
+        radius_before = tof.li[0]
+
     # Changes the radii to be self-consistent with the provided radius
     # (affects mass and rotational parameter):
     _fixradius(tof)
+    if trace:
+        mass_factor = tof.opts["M_phys"] / _mass_int(tof)
     # Changes the densities to to be self-consistent with the provided mass
     # (affects rotational parameter):
     _fixmass(tof)
+    if trace:
+        # Shown as 1 +/- deviation, since the factors soon differ from 1 by
+        # less than what a fixed number of decimals can show:
+        radius_dev = tof.li[0] / radius_before - 1
+        density_dev = mass_factor - 1
+        say(
+            tof.opts["verbosity"],
+            3,
+            "Renormalized the radii by a factor 1 {radius_sign} "
+            "{radius_dev:.2e} and the densities by a factor 1 "
+            "{density_sign} {density_dev:.2e}.",
+            radius_sign="-" if radius_dev < 0 else "+",
+            radius_dev=abs(radius_dev),
+            density_sign="-" if density_dev < 0 else "+",
+            density_dev=abs(density_dev),
+        )
     # Changes the rotational parameter to be self-consistent
     # (affects nothing else):
     _fixrot(tof)
@@ -114,15 +143,16 @@ def _pressurize(tof):
     assuming hydrostatic equilibrium.
     """
 
+    # The potential is positive (GM/r for a point mass), so dP = rho dU:
     tof.U = (
-        -tof.opts["G"]
+        tof.opts["G"]
         * tof.opts["M_phys"]
         / tof.li[0] ** 3
         * tof.li**2
-        * np.flip(tof.A0)
+        * tof.A0
     )
 
-    integrand = -tof.rhoi * np.gradient(tof.U, tof.li, edge_order=2)
+    integrand = tof.rhoi * np.gradient(tof.U, tof.li, edge_order=2)
 
     if tof.simpson_in_use:
         tof.Pi = tof.opts["P0"] - scipy.integrate.cumulative_simpson(
@@ -142,13 +172,9 @@ def _pressurize(tof):
         not (tof.Pi >= 0).all() or not (np.diff(tof.Pi) >= 0).all()
     ):
         tof._simpson_failed = True
-        say(
-            tof.opts["verbosity"],
-            1,
-            "Calculated pressure contains negative or non-monotonic entries! "
-            "Reverting to the more stable and less accurate trapezoid rule "
-            "for integration to hopefully mitigate the issue.",
-            kind="warn",
+        warn_simpson_fallback(
+            "the calculated pressure contains negative or non-monotonic "
+            "entries."
         )
         _pressurize(tof)
 
@@ -200,9 +226,28 @@ def _apply_atmosphere(tof):
     # Define index that marks the transition from the atmosphere to the rest of
     # the model:
     index = np.arange(tof.opts["N"])[tof.Pi > tof.opts["atmosphere_until"]][0]
-    tof.atmosphere_index = max(
-        index, tof.atmosphere_index
-    )  # prevent index oscillations
+    old_index = tof.atmosphere_index
+    # Follow the pressures, but stop following (and only let the transition
+    # move inwards) as soon as it reverses direction: a transition that
+    # flips between two level surfaces never converges.
+    step = index - old_index
+    if step * tof._atmosphere_last_step < 0:
+        tof._atmosphere_locked = True
+    if tof._atmosphere_locked:
+        index = max(index, old_index)
+    if step != 0:
+        tof._atmosphere_last_step = step
+    tof.atmosphere_index = index
+    if tof.atmosphere_index != old_index:
+        say(
+            tof.opts["verbosity"],
+            2,
+            "The atmosphere model now extends to level surface {index} of "
+            "{N} at a pressure of {pressure:.2e} Pa.",
+            index=tof.atmosphere_index,
+            N=tof.opts["N"],
+            pressure=tof.Pi[tof.atmosphere_index],
+        )
 
     # Adjust the densities to fit the atmosphere model:
     tof.rhoi[: (tof.atmosphere_index + 1)] = tof.opts["atmosphere"](
@@ -215,20 +260,40 @@ def _apply_atmosphere(tof):
         raise ValueError("Atmosphere created density inversion!")
 
 
+def _check_atmosphere(tof):
+    """
+    Warns if the atmosphere model extends more than one level surface deeper
+    than atmosphere_until, which happens if the transition moved inwards early
+    on (when the pressures were still inaccurate) and was then locked. One
+    level surface of slack is the resolution of the grid.
+    """
+
+    index = tof.atmosphere_index
+    if index > 1 and tof.Pi[index - 2] > tof.opts["atmosphere_until"]:
+        warn(
+            "The atmosphere model extends to a pressure of {pressure:.2e} Pa, "
+            "deeper than atmosphere_until = {until:.2e} Pa.",
+            AccuracyWarning,
+            stacklevel=4,
+            pressure=tof.Pi[index - 2],
+            until=tof.opts["atmosphere_until"],
+        )
+
+
 def _warn_not_converged_drho(tof, drho):
     """
-    Warns that the densities did not converge within max_iter_update
+    Warns that the densities did not converge within max_iter_density_update
     iterations.
     """
 
     warn(
-        "drho = {drho:.0e} > {tol:.0e} = drho_tol after max_iter_update = "
-        "{max_iter} iterations.",
+        "drho = {drho:.0e} > {tol:.0e} = drho_tol after "
+        "max_iter_density_update = {max_iter} iterations.",
         ConvergenceWarning,
-        stacklevel=3,
+        stacklevel=4,
         drho=drho,
         tol=tof.opts["drho_tol"],
-        max_iter=tof.opts["max_iter_update"],
+        max_iter=tof.opts["max_iter_density_update"],
     )
 
 
@@ -251,7 +316,7 @@ def _warn_not_converged(tof, drot, dJs, drho, max_iter_name):
     warn(
         "{details} after {name} = {max_iter} iterations.",
         ConvergenceWarning,
-        stacklevel=3,
+        stacklevel=4,
         details=", ".join(parts),
         name=max_iter_name,
         max_iter=tof.opts[max_iter_name],
@@ -261,11 +326,17 @@ def _warn_not_converged(tof, drot, dJs, drho, max_iter_name):
 def get_Js_errors(self):
     """
     Fills self.Js_errors with error estimates for the gravitational moments
-    Js calculated by the Theory of Figures, based on the convergence study in
+    Js calculated by the Theory of Figures. They are absolute errors (in the
+    units of Js; divide by abs(Js) for the relative errors, which is what the
+    tables store), based on the convergence study in
     accuracy/accuracy_full.ipynb (tables PyToF/accuracy_data_*.npz). Not
     called automatically: call it after relax_to_shape(), relax_to_barotrope()
     or relax_to_density(). Not available with differential rotation or a
     non-equidistant grid (warns instead).
+
+    The tables belong to the integration rule that is in use: Simpson's rule,
+    unless the option use_simpson is False or PyToF fell back to the
+    trapezoid rule (see ToF.simpson_in_use), which is less accurate.
     """
 
     if max(abs(self.opts["alphas"])) != 0:
@@ -282,24 +353,10 @@ def get_Js_errors(self):
         )
         return 0
 
+    HERE = Path(__file__).resolve().parent
     if self.simpson_in_use:
-        say(
-            self.opts["verbosity"],
-            1,
-            "Simpson's rule is in use. This ensures the highest possible "
-            "accuracy.",
-        )
-        HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_simpson.npz")
     else:
-        say(
-            self.opts["verbosity"],
-            1,
-            "The trapezoid rule is in use. This yields a reduced accuracy. "
-            "Either the option use_simpson is False or PyToF switched to the "
-            "trapezoid rule on its own to mitigate stability issues.",
-        )
-        HERE = Path(__file__).resolve().parent
         accuracy_data = np.load(HERE / "accuracy_data_trapezoid.npz")
 
     Ns_n_bins = accuracy_data["Ns_n_bins"]
@@ -359,9 +416,8 @@ def get_r_l_mu(self, mu):
     r_l_mu = 1
 
     for i in range(len(self.figure_functions)):
-        # Flip since AlgoToF uses a different ordering logic:
         r_l_mu = r_l_mu + np.outer(
-            np.flip(self.figure_functions[i]),
+            self.figure_functions[i],
             np.polynomial.legendre.Legendre.basis(2 * i)(mu),
         )
 
@@ -372,17 +428,17 @@ def get_U_l_mu(self, mu):
     """
     This function returns an array with shape (self.opts['N'], length(mu))
     that stores the values of the potential U that is defined in equation (B.3)
-    from arXiv:1708.06177v1 for each l and each mu.
+    from arXiv:1708.06177v1 for each l and each mu. As for self.U, the sign is
+    such that the potential of a point mass is +GM/r.
 
     mu: Array of cos(theta) values where theta is the colatitude.
     """
 
-    # Flip since AlgoToF uses a different ordering logic:
     return (
-        -self.opts["G"]
+        self.opts["G"]
         * self.opts["M_phys"]
         / self.li[0] ** 3
-        * np.outer(self.li**2 * np.flip(self.A0), np.ones_like(mu))
+        * np.outer(self.li**2 * self.A0, np.ones_like(mu))
     )
 
 
@@ -414,12 +470,9 @@ def get_NMoI(self, N=1000):
     )  # dmu dl
 
     if not np.allclose(np.diff(self.li), np.diff(self.li)[0]):
-        say(
-            self.opts["verbosity"],
-            1,
+        warn(
             "Mean levels surfaces are not equidistant! NMoI integration "
-            "will be inaccurate.",
-            kind="warn",
+            "will be inaccurate."
         )
 
     integrand_l = scipy.integrate.simpson(integrand_l_theta, x=mu, axis=1)
@@ -460,15 +513,17 @@ def get_Kn(self, n, bs=None):
     rho_prime = scipy.interpolate.interp1d(
         self.li[::-1], np.gradient(self.rhoi, self.li)[::-1]
     )
-    U_prime = scipy.interpolate.interp1d(
-        self.li[::-1], np.gradient(self.U, self.li)[::-1]
+    # Gravitational acceleration g = -dU/dl, positive since U decreases
+    # outwards:
+    g = scipy.interpolate.interp1d(
+        self.li[::-1], -np.gradient(self.U, self.li)[::-1]
     )
 
     # Define right-hand side of the differential equation:
     # (1D, 2nd order) -> (2D, 1st order)
     def rhs(t, y):
         Q = (
-            4 * np.pi * self.opts["G"] * rho_prime(t) / U_prime(t)
+            4 * np.pi * self.opts["G"] * rho_prime(t) / g(t)
             + n * (n + 1) / t**2
         )
         return [y[1], Q * y[0] - 2 / t * y[1]]
@@ -501,7 +556,7 @@ def get_Kn(self, n, bs=None):
         )
         say(
             self.opts["verbosity"],
-            1,
+            2,
             "Boundary condition applied at a radius of r/R={radius:.2f} "
             "with a density jump of {jump:.2e} kg/m^3.",
             radius=bs[i] / R,
@@ -517,7 +572,7 @@ def get_Kn(self, n, bs=None):
             * self.opts["G"]
             * delta_rho
             * T_n[-1]
-            / U_prime(bs[i]),
+            / g(bs[i]),
         ]
 
         # Solve further parts of the differential equation:
@@ -535,13 +590,13 @@ def get_Kn(self, n, bs=None):
 
     # Apply final boundary condition:
     scale = (
-        (2 * n + 1) * U_prime(R) / (sol.y[1, -1] + (n + 1) * sol.y[0, -1] / R)
+        (2 * n + 1) * g(R) / (sol.y[1, -1] + (n + 1) * sol.y[0, -1] / R)
     )
     T_n *= scale
     T_n_prime *= scale
 
     # Calculate Love function:
-    K_n = (T_n / R / U_prime(R)) * (R / r) ** n - 1
+    K_n = (T_n / R / g(R)) * (R / r) ** n - 1
 
     return r, T_n, K_n
 
@@ -594,7 +649,8 @@ def _relax_to_shape(tof, maxiter="default"):
     """
     Runs AlgoToF.Algorithm on the current level surfaces and densities and
     stores the results in tof. Returns the Algorithm output, which says
-    whether it converged. Does not warn, since relax_to_barotrope() and
+    whether it converged, how many iterations it took and, as out.seconds,
+    how long. Does not warn, since relax_to_barotrope() and
     relax_to_density() deliberately call this with a small maxiter.
     """
 
@@ -602,7 +658,7 @@ def _relax_to_shape(tof, maxiter="default"):
     alphas = np.zeros(len(tof.opts["alphas"]))
 
     if maxiter == "default":
-        maxiter = tof.opts["max_iter_shape"]
+        maxiter = tof.opts["max_iter_relax_shape"]
 
     # Convert barotropic differential rotation parameters to Theory of Figures
     # logic:
@@ -635,29 +691,22 @@ def _relax_to_shape(tof, maxiter="default"):
         verbosity=tof.opts["verbosity"],
         debug_plot=tof.opts["debug_plot"],
         R_ref=tof.opts["R_ref"],
-        ss_initial=tof.figure_functions,
+        # AlgoToF wants the innermost level surface first:
+        ss_initial=[np.flip(s) for s in tof.figure_functions],
         alphas=alphas,
         H=tof.opts["H"],
         use_simpson=tof.simpson_in_use,
     )
 
-    # Measure ToF performance:
-    toc = time.time()
-
-    say(
-        tof.opts["verbosity"],
-        3,
-        "Relaxing to shape done in {seconds:.2e} seconds.",
-        seconds=toc - tic,
-    )
+    # Measure ToF performance (reported by the callers):
+    out.seconds = time.time() - tic
 
     # Save results:
-    tof.A0 = out.A0  # inside->outside instead of outside->inside since
-    # AlgoToF uses a different ordering logic!
-    # inside->outside instead of outside->inside since AlgoToF uses a
-    # different ordering logic:
-    tof.figure_functions = out.ss
-    tof.volume_integrals = out.SS
+    # AlgoToF orders its arrays from the innermost to the outermost level
+    # surface; ToF stores everything from the outermost inwards, like li:
+    tof.A0 = np.flip(out.A0)
+    tof.figure_functions = [np.flip(s) for s in out.ss]
+    tof.volume_integrals = [np.flip(S) for S in out.SS]
     tof.R_eq_to_R_m = out.R_eq_to_R_m
     tof.R_po_to_R_m = out.R_po_to_R_m
     if tof.simpson_in_use and not out.use_simpson:
@@ -675,10 +724,25 @@ def relax_to_shape(self, check_consistency=True, maxiter="default"):
                         consistent with the shape of the planet calculated by
                         PyToF
     maxiter:            Maximum number of iterations to perform. If "default",
-                        uses the self.opts['max_iter_shape'] value.
+                        uses the self.opts['max_iter_relax_shape'] value.
     """
 
     out = _relax_to_shape(self, maxiter)
+
+    say(
+        self.opts["verbosity"],
+        1,
+        "Relaxing to shape finished after {iterations} iterations: "
+        "dJ = {dJ:.1e}.",
+        iterations=out.it + 1,
+        dJ=out.dJ_max,
+    )
+    say(
+        self.opts["verbosity"],
+        2,
+        "Relaxing to shape done in {seconds:.2e} seconds.",
+        seconds=out.seconds,
+    )
 
     if not out.converged:
         warn(
@@ -727,6 +791,7 @@ def _relax(self, update_densities, max_iter_name, name):
 
         # Define iteration counter for density loop:
         IterUpdate = 1
+        n_updates = 0
 
         if self.opts["debug_plot"]:
             from PyToF.PlotDebugToF import debug_FunctionsToF_plot
@@ -737,11 +802,12 @@ def _relax(self, update_densities, max_iter_name, name):
 
         # Converge on densities (without an atmosphere this loop ends after
         # one iteration for relax_to_density()):
-        while IterUpdate < self.opts["max_iter_update"]:
+        while IterUpdate < self.opts["max_iter_density_update"]:
             # Store old values:
             old_rho = self.rhoi
 
             update_densities(self)
+            n_updates += 1
 
             # Update drho, ignore first entry to avoid possible division by
             # zero:
@@ -758,11 +824,11 @@ def _relax(self, update_densities, max_iter_name, name):
         self._debug_iteration += 1
 
         # Warning if not converged:
-        if IterUpdate == self.opts["max_iter_update"]:
+        if IterUpdate == self.opts["max_iter_density_update"]:
             _warn_not_converged_drho(self, drho)
 
         # Call relax_to_shape():
-        _relax_to_shape(self, maxiter=2)
+        shape = _relax_to_shape(self, maxiter=2)
 
         # Store old values:
         old_m = self.m_rot_calc
@@ -782,6 +848,21 @@ def _relax(self, update_densities, max_iter_name, name):
         dJs = np.max(np.abs(self.Js[mask] / old_Js[mask] - 1))
         drho = np.max(np.abs(self.rhoi[1:] / old_rho[1:] - 1))
 
+        say(
+            self.opts["verbosity"],
+            3,
+            "Iteration {iteration}: drot = {drot:.1e}, dJ = {dJs:.1e}, "
+            "drho = {drho:.1e}; {n_updates} density updates, {n_shape} shape "
+            "iterations in {seconds:.2e} seconds.",
+            iteration=iteration,
+            drot=drot,
+            dJs=dJs,
+            drho=drho,
+            n_updates=n_updates,
+            n_shape=shape.it + 1,
+            seconds=shape.seconds,
+        )
+
         if (
             drot < self.opts["drot_tol"]
             and dJs < self.opts["dJ_tol"]
@@ -799,7 +880,21 @@ def _relax(self, update_densities, max_iter_name, name):
     if iteration == self.opts[max_iter_name]:
         _warn_not_converged(self, drot, dJs, drho, max_iter_name)
 
+    if self.opts["use_atmosphere"]:
+        _check_atmosphere(self)
+
     # Verbosity output:
+    say(
+        self.opts["verbosity"],
+        1,
+        "Relaxing to {name} finished after {iterations} iterations: "
+        "drot = {drot:.1e}, dJ = {dJs:.1e}, drho = {drho:.1e}.",
+        name=name,
+        iterations=iteration,
+        drot=drot,
+        dJs=dJs,
+        drho=drho,
+    )
     say(
         self.opts["verbosity"],
         2,
@@ -834,11 +929,14 @@ def relax_to_barotrope(self):
     Calls relax_to_shape() and _update_densities_barotrope() until either the
     accuray given by self.opts['dJ_tol'], self.opts['drot_tol'] and
     self.opts['drho_tol'] is fulfilled or
-    self.opts['max_iter_barotrope'] is reached.
+    self.opts['max_iter_relax_barotrope'] is reached.
     """
 
     return _relax(
-        self, _update_densities_barotrope, "max_iter_barotrope", "barotrope"
+        self,
+        _update_densities_barotrope,
+        "max_iter_relax_barotrope",
+        "barotrope",
     )
 
 
@@ -847,7 +945,9 @@ def relax_to_density(self):
     Calls relax_to_shape() until either the accuray given by
     self.opts['dJ_tol'], self.opts['drot_tol'] and
     self.opts['drho_tol'] is fulfilled or
-    self.opts['max_iter_density'] is reached.
+    self.opts['max_iter_relax_density'] is reached.
     """
 
-    return _relax(self, _update_densities_given, "max_iter_density", "density")
+    return _relax(
+        self, _update_densities_given, "max_iter_relax_density", "density"
+    )

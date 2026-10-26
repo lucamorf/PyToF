@@ -16,7 +16,7 @@ from PyToF.FunctionsToF import (
     relax_to_shape,
     set_barotrope,
 )
-from PyToF.messages import RenamedWarning, say, warn
+from PyToF.messages import RenamedWarning, warn
 from PyToF.options import Options
 
 
@@ -74,7 +74,9 @@ class ToF:
         is undone, so the result of a calculation does not depend on the
         models calculated before with the same object.
 
-        Sets...
+        Sets... All arrays with one entry per level surface (li, rhoi, Pi,
+        U, A0 and every array in figure_functions and volume_integrals) run
+        from the outermost to the innermost level surface.
 
         - li:               Array, level surfaces l, Eq. (B.1) in
                             arXiv:1708.06177v1
@@ -82,9 +84,11 @@ class ToF:
         - Pi:               Array, pressures at the level surfaces li
         - Js:               Array, gravitational harmonics, Eq. (B.11) in
                             arXiv:1708.06177v1
-        - Js_errors:         Array, estimated errors of the gravitational
-                            harmonics Js, only if no binning or differential
-                            rotation is used
+        - Js_errors:        Array, estimated absolute errors of the
+                            gravitational harmonics Js (same units as Js,
+                            divide by abs(Js) for relative errors), only if no
+                            differential rotation or non-equidistant grid is
+                            used
         - R_calc            Float, calculated equatorial radius in SI units
         - m_rot_calc:       Float, dimensionless rotational parameter
         - figure_functions: List of arrays, figure functions s_n introduced in
@@ -92,6 +96,9 @@ class ToF:
         - volume_integrals: List of arrays, dimensionless volume integrals S_n
                             introduced in Eq. (B.7) in arXiv:1708.06177v1,
                             followed by the primed integrals S'_n
+        - U:                Array, total potential (gravity plus centrifugal)
+                            on the level surfaces in m^2 s^-2, positive: a
+                            point mass has +GM/r, and dP = rho dU
         - A0:               Array, important to determine the total potential
                             introduced in Eq. (B.3) in arXiv:1708.06177v1
         - R_eq_to_R_m:      Float, ratio of the equatorial radius to the to
@@ -139,6 +146,8 @@ class ToF:
         self.R_eq_to_R_m = 1.0
         self.R_po_to_R_m = 1.0
         self.atmosphere_index = 0
+        self._atmosphere_last_step = 0
+        self._atmosphere_locked = False
 
     def __init__(self, **kwargs):
         """
@@ -151,14 +160,6 @@ class ToF:
 
         if self.opts["R_ref"] is None:
             self.opts["R_ref"] = self.opts["R_phys"][0]
-
-            say(
-                self.opts["verbosity"],
-                1,
-                "No reference radius supplied by the user. PyToF assumes "
-                "R_ref = R_phys.",
-                kind="warn",
-            )
 
         # Set initial conditions:
         self.reset()

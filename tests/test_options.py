@@ -83,9 +83,9 @@ def test_unknown_name_cannot_be_read_or_written():
         ({"R_phys": 7e7}, TypeError),
         ({"R_phys": [7e7]}, TypeError),
         ({"verbosity": -1}, ValueError),
-        ({"max_iter_barotrope": 1}, ValueError),
-        ({"max_iter_density": 0}, ValueError),
-        ({"max_iter_update": 1}, ValueError),
+        ({"max_iter_relax_barotrope": 1}, ValueError),
+        ({"max_iter_relax_density": 0}, ValueError),
+        ({"max_iter_density_update": 1}, ValueError),
         ({"verbosity": "loud"}, ValueError),
     ],
 )
@@ -159,10 +159,14 @@ def test_every_option_is_documented_and_grouped():
 # ---------------------------------------------------------- renamed options
 
 RENAMED = {
-    "MaxIterShape": "max_iter_shape",
-    "MaxIterUpdate": "max_iter_update",
-    "MaxIterBar": "max_iter_barotrope",
-    "MaxIterDen": "max_iter_density",
+    "MaxIterShape": "max_iter_relax_shape",
+    "MaxIterUpdate": "max_iter_density_update",
+    "MaxIterBar": "max_iter_relax_barotrope",
+    "MaxIterDen": "max_iter_relax_density",
+    "max_iter_shape": "max_iter_relax_shape",
+    "max_iter_update": "max_iter_density_update",
+    "max_iter_barotrope": "max_iter_relax_barotrope",
+    "max_iter_density": "max_iter_relax_density",
     "baro_param_init": "baro_param",
 }
 
@@ -184,23 +188,25 @@ def test_old_option_names_still_work_but_warn(old, new):
 
 
 def test_old_names_work_as_constructor_keywords():
-    with pytest.warns(RenamedWarning, match="max_iter_barotrope") as record:
+    with pytest.warns(
+        RenamedWarning, match="max_iter_relax_barotrope"
+    ) as record:
         X = ClassToF.ToF(N=64, MaxIterBar=7)
     assert record[0].filename == __file__
-    assert X.opts["max_iter_barotrope"] == 7
+    assert X.opts["max_iter_relax_barotrope"] == 7
 
 
 def test_setting_an_old_name_changes_the_new_option():
     opts = Options()
     with pytest.warns(RenamedWarning):
         opts["MaxIterShape"] = 5
-    assert opts["max_iter_shape"] == 5
+    assert opts["max_iter_relax_shape"] == 5
 
 
 def test_old_and_new_name_together_are_rejected():
     with pytest.warns(RenamedWarning):
         with pytest.raises(TypeError, match="same option"):
-            Options.from_kwargs(MaxIterBar=3, max_iter_barotrope=4)
+            Options.from_kwargs(MaxIterBar=3, max_iter_relax_barotrope=4)
 
 
 def test_membership_accepts_old_names_quietly():
@@ -213,9 +219,11 @@ def test_new_names_do_not_warn():
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        opts = Options.from_kwargs(max_iter_barotrope=3, max_iter_update=4)
-        opts["max_iter_density"] = 5
-        assert opts.max_iter_barotrope == 3
+        opts = Options.from_kwargs(
+            max_iter_relax_barotrope=3, max_iter_density_update=4
+        )
+        opts["max_iter_relax_density"] = 5
+        assert opts.max_iter_relax_barotrope == 3
 
 
 # -------------------------------------------------- renamed attributes
