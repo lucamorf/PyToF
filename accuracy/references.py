@@ -1,9 +1,9 @@
 """
 Reference solutions used by the accuracy notebooks and the test suite.
 
-Every number in this file comes from the literature; nothing is fitted to
-PyToF. The tests (``tests/cases.py``) import ``Bessel`` from here, so the
-notebooks and the tests cannot disagree.
+Every number in this file comes from the literature (or is derived, as said
+in the comment) and nothing is fitted to PyToF. The tests import from here
+(``tests/cases.py``), so the notebooks and the tests cannot disagree.
 """
 
 import numpy as np
@@ -12,6 +12,15 @@ import scipy.special
 JUPITER_RADIUS = (
     71492000.0  # m, equatorial radius used for the J_2n of Jupiter
 )
+
+# Measured J_2 of Jupiter (Juno), reference radius JUPITER_RADIUS, without the
+# permanent tide of the satellites (6.72e-8; with it, J_2 = 14696.5735e-6
+# +/- 0.0017e-6). Value and uncertainty: (J_2, sigma), as used in
+# Militzer, B. and Hubbard, W. B., arXiv:2401.12166 (2024), who take them from
+# Durante, D. et al., "Jupiter's Gravity Field Halfway Through the Juno
+# Mission", Geophys. Res. Lett. 47, e2019GL086572 (2020),
+# doi:10.1029/2019GL086572.
+JUNO_J2 = (14696.5063e-6, 0.0006e-6)
 
 # --------------------------------------------------------------------------
 # Gravitational moments of Jupiter-like polytropes
@@ -133,6 +142,27 @@ NMOI_SPHERE_LINEAR_DENSITY = 4 / 15  # rho = rho_c * r / R
 #   "quadratic":  rho = 2.5 rho_mean (1 - x^2)
 #   "polytropic": rho = pi^2/3 rho_mean sin(pi x) / (pi x)       (n = 1)
 # with x = r/R.
+
+
+def two_layer_k2(r_core, rho_core, rho_mantle, radius=1.0):
+    """
+    k_2 of a non-rotating fluid planet of two homogeneous layers, Eq. (2) of
+    Consorzi, A., Melini, D. and Spada, G., "Relation between the moment of
+    inertia and the k2 Love number of fluid extra-solar planets", A&A 676, A21
+    (2023), doi:10.1051/0004-6361/202346352, arXiv:2307.03583, who attribute
+    the closed form to Ragazzo (2020). The paper gives the Love number divided
+    by the homogeneous value 3/2, as a function of z = r_core / radius and
+    alpha = (rho_core - rho_mantle) / rho_core.
+    """
+
+    z = r_core / radius
+    a = (rho_core - rho_mantle) / rho_core
+    return (
+        1.5
+        * 2
+        * (5 + a * (5 * a * z**8 + 8 * (1 - a) * z**5 + 3 * a - 8))
+        / (10 + a * (9 * z**5 * (a - 1) + 5 * z**3 * (5 - 3 * a) + 6 * a - 16))
+    )
 
 
 def love_cases(rho_mean, radius, G, n_terms=50):

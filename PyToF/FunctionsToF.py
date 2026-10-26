@@ -489,7 +489,14 @@ def get_Kn(self, n, bs=None):
     of n-th degree based on solving a differential equation for T_n(r).
 
     n: An integer greater or equal to two, determines Love function degree.
-    bs: An array that contains the radii of all density discontinuities.
+    bs: An array that contains the radii of all density discontinuities
+        inside the planet. A discontinuity at the surface (a nonzero density
+        at the outermost level surface) is taken into account automatically.
+
+    A density jump is not integrated over as a steep gradient: the grid cells
+    around each radius in bs are removed from the density derivative, which
+    then belongs to the continuous part of the profile, and the jump enters
+    through its boundary condition for T_n'.
     """
 
     # Assure that the potential has been calculated for the current density
@@ -506,13 +513,31 @@ def get_Kn(self, n, bs=None):
         bs = np.array([r0, R])
     else:
         bs = np.concatenate(
-            (np.atleast_1d(r0), np.atleast_1d(bs), np.atleast_1d(R))
+            (np.atleast_1d(r0), np.sort(np.atleast_1d(bs)), np.atleast_1d(R))
         )
 
-    # Calculate density and potential derivatives:
-    rho_prime = scipy.interpolate.interp1d(
-        self.li[::-1], np.gradient(self.rhoi, self.li)[::-1]
-    )
+    # Grid index and size of every density jump:
+    jumps = []
+    for b in bs[1:-1]:
+        k = np.argmin(np.abs(self.li - b))
+        jumps.append(
+            (
+                k,
+                max(
+                    self.rhoi[k] - self.rhoi[k - 1],
+                    self.rhoi[k + 1] - self.rhoi[k],
+                ),
+            )
+        )
+
+    # Calculate density and potential derivatives. The derivative of the
+    # density is that of its continuous part: the jumps, which np.gradient
+    # smears over the neighbouring grid points, enter via the boundary
+    # conditions below, and must not be counted twice.
+    drho = np.gradient(self.rhoi, self.li)
+    for k, _ in jumps:
+        drho[k - 1 : k + 2] = 0.0
+    rho_prime = scipy.interpolate.interp1d(self.li[::-1], drho[::-1])
     # Gravitational acceleration g = -dU/dl, positive since U decreases
     # outwards:
     g = scipy.interpolate.interp1d(
@@ -546,14 +571,7 @@ def get_Kn(self, n, bs=None):
 
     # Solve further parts of the differential equation, if there are any:
     for i in range(1, len(bs) - 1):
-        # Find index closest to boundary:
-        index = np.argmin(np.abs(self.li - bs[i]))
-
-        # Calculate jump in density:
-        delta_rho = max(
-            self.rhoi[index] - self.rhoi[index - 1],
-            self.rhoi[index + 1] - self.rhoi[index],
-        )
+        delta_rho = jumps[i - 1][1]
         say(
             self.opts["verbosity"],
             2,
@@ -567,12 +585,7 @@ def get_Kn(self, n, bs=None):
         y0 = [
             T_n[-1],
             T_n_prime[-1]
-            - 4
-            * np.pi
-            * self.opts["G"]
-            * delta_rho
-            * T_n[-1]
-            / g(bs[i]),
+            - 4 * np.pi * self.opts["G"] * delta_rho * T_n[-1] / g(bs[i]),
         ]
 
         # Solve further parts of the differential equation:
@@ -588,9 +601,14 @@ def get_Kn(self, n, bs=None):
         T_n = np.concatenate((T_n, sol.y[0]))
         T_n_prime = np.concatenate((T_n_prime, sol.y[1]))
 
-    # Apply final boundary condition:
+    # Apply final boundary condition. If the density is not zero at the
+    # surface, T_n' jumps there as well, by the same condition as inside:
+    jump_surface = (
+        4 * np.pi * self.opts["G"] * self.rhoi[0] * sol.y[0, -1] / g(R)
+    )
+    T_n_prime_outside = sol.y[1, -1] - jump_surface
     scale = (
-        (2 * n + 1) * g(R) / (sol.y[1, -1] + (n + 1) * sol.y[0, -1] / R)
+        (2 * n + 1) * g(R) / (T_n_prime_outside + (n + 1) * sol.y[0, -1] / R)
     )
     T_n *= scale
     T_n_prime *= scale
