@@ -93,6 +93,18 @@ class Options:
         "its own if Simpson's rule becomes unstable, see ToF.simpson_in_use.",
         "numerics",
     )
+    surface_exponent_warn: float = _option(
+        0.9,
+        "Warn if the density near the surface behaves like (R - r)^n with "
+        "n below this value (an infinite slope at the surface, e.g. a "
+        "polytrope with index n < 1), because Simpson's rule may then "
+        "converge slowly, see the tutorial on numerics. The exponent is "
+        "estimated from the three outermost grid points in the third "
+        "iteration of relax_to_barotrope() / relax_to_density(); it is "
+        "slightly below the true n (0.86 for n = 0.8), so the default 0.9 "
+        "flags n of about 0.85 and below. 0 switches the check off.",
+        "numerics",
+    )
     dJ_tol: float = _option(
         1e-10, "Relative tolerance of the gravitational moments to quantify convergence.", "numerics"
     )
@@ -308,6 +320,15 @@ class Options:
     @classmethod
     def _validate_max_iter_relax_density(cls, value):
         cls._validate_max_iteration_count("max_iter_relax_density", value)
+
+    @staticmethod
+    def _validate_surface_exponent_warn(value):
+        is_number = isinstance(value, (int, float, np.integer, np.floating))
+        if not is_number or not 0 <= value <= 1:
+            raise ValueError(
+                f"surface_exponent_warn must be a number between 0 and 1, "
+                f"not {value!r}."
+            )
 
     @staticmethod
     def _validate_verbosity(value):

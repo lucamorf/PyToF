@@ -51,6 +51,7 @@ __all__ = [
     "say",
     "warn",
     "warn_simpson_fallback",
+    "warn_surface_slope",
 ]
 
 _RESET = "\033[0m"
@@ -179,4 +180,24 @@ def warn_simpson_fallback(reason):
         AccuracyWarning,
         stacklevel=2,
         reason=reason,
+    )
+
+
+def warn_surface_slope(exponent, threshold):
+    """
+    Warn that the density has a (nearly) infinite slope at the surface, which
+    Simpson's rule handles badly. ``exponent`` is the estimated n of
+    rho ~ (R - r)^n, ``threshold`` the option surface_exponent_warn.
+    """
+
+    warn(
+        "The density near the surface behaves like (R - r)^{exponent:.2f}, "
+        "below the limit {threshold:.2f} of the option surface_exponent_warn: "
+        "its slope is (nearly) infinite there. Simpson's rule may then "
+        "converge slowly or not at all (ConvergenceWarning); try "
+        "use_simpson=False.",
+        AccuracyWarning,
+        stacklevel=2,
+        exponent=exponent,
+        threshold=threshold,
     )

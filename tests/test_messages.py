@@ -207,3 +207,56 @@ def test_error_estimate_unavailable_warns():
     X = jupiter_polytrope(4, 64, alphas=np.r_[1.0, np.zeros(11)])
     with pytest.warns(PyToFWarning, match="differential rotation"):
         X.get_Js_errors()
+
+
+# ------------------------------------------------- infinite slope at surface
+
+
+def _polytrope(n, **kwargs):
+    X = ClassToF.ToF(**{"N": 256, "order": 4, **kwargs})
+    X.set_barotrope(lambda P, param: P ** (n / (n + 1)))
+    return X
+
+
+def test_surface_slope_warns_for_polytrope_below_one():
+    X = _polytrope(0.8)
+    with pytest.warns(AccuracyWarning, match=r"\(R - r\)\^0\.8\d"):
+        X.relax_to_barotrope()
+
+
+def test_surface_slope_warns_with_realistic_surface_pressure():
+    X = _polytrope(0.8, P0=1e5, N=1024)
+    with pytest.warns(AccuracyWarning, match="surface_exponent_warn"):
+        X.relax_to_barotrope()
+
+
+@pytest.mark.parametrize("n", [1.0, 1.5])
+def test_surface_slope_silent_for_finite_slope(n):
+    X = _polytrope(n)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", AccuracyWarning)
+        X.relax_to_barotrope()
+
+
+def test_surface_slope_option_changes_or_disables_the_check():
+    X = _polytrope(0.8, surface_exponent_warn=0.8)  # estimate ~0.86 is above
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", AccuracyWarning)
+        X.relax_to_barotrope()
+
+    X = _polytrope(0.8, surface_exponent_warn=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", AccuracyWarning)
+        X.relax_to_barotrope()
+
+
+def test_surface_slope_silent_without_simpson():
+    X = _polytrope(0.8, use_simpson=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", AccuracyWarning)
+        X.relax_to_barotrope()
+
+
+def test_surface_slope_option_is_validated():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        ClassToF.ToF(surface_exponent_warn=1.5)

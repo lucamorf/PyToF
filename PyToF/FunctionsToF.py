@@ -16,7 +16,11 @@ from PyToF.messages import (
     say,
     warn,
     warn_simpson_fallback,
+    warn_surface_slope,
 )
+
+# Iteration of _relax() in which _check_surface_slope() looks at the densities:
+SURFACE_CHECK_ITERATION = 3
 
 
 def _mass_int(tof):
@@ -185,6 +189,41 @@ def _pressurize(tof):
     assert (np.diff(tof.Pi) >= 0).all(), (
         "Calculated pressure is not monotonically increasing!"
     )
+
+
+def _check_surface_slope(tof):
+    """
+    Warn if the density has an infinite slope at the surface. Near the surface
+    rho ~ c s^n with s the distance from it; on the equidistant grid the first
+    three points (s = 0, h, 2h) give (rho[2] - rho[1]) / (rho[1] - rho[0]) =
+    2^n - 1, so n = log2(1 + that ratio). n = 1 for a finite slope, n < 1 for
+    an infinite one, which Simpson's rule handles badly (it integrates
+    np.gradient(rho)).
+
+    Called once per relaxation in iteration SURFACE_CHECK_ITERATION, not in
+    the first: the first densities follow from the pressure of the starting
+    profile and show an exponent 2n / (n + 1) instead of n. By the third the
+    estimate has settled; it stays slightly below the true n
+    for n < 1 (0.86 for n = 0.8), so the default limit 0.9 flags n of about
+    0.85 and below, which are the cases that converge badly. A surface
+    pressure P0 much above ~1e6 Pa hides the singularity from the three
+    outermost points (the estimate tends to 1), without curing the slow
+    convergence.
+    """
+
+    threshold = tof.opts["surface_exponent_warn"]
+    if not tof.simpson_in_use or threshold <= 0:
+        return
+
+    first = tof.rhoi[0] - tof.rhoi[1]
+    second = tof.rhoi[1] - tof.rhoi[2]
+    # Flat or decreasing outwards (e.g. a zero-density layer): no exponent.
+    if not (first < 0 and second < 0):
+        return
+
+    exponent = np.log2(1 + second / first)
+    if exponent < threshold:
+        warn_surface_slope(exponent, threshold)
 
 
 def _update_densities_barotrope(tof):
@@ -826,6 +865,8 @@ def _relax(self, update_densities, max_iter_name, name):
 
             update_densities(self)
             n_updates += 1
+            if iteration == SURFACE_CHECK_ITERATION and n_updates == 1:
+                _check_surface_slope(self)
 
             # Update drho, ignore first entry to avoid possible division by
             # zero:
