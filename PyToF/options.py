@@ -85,7 +85,11 @@ class Options:
         "positive values smaller than N are faster but less accurate.",
         "numerics",
     )
-    order: int = _option(4, "Theory of Figures order: 4, 7 or 10. Higher orders are slower and more accurate.", "numerics")
+    order: int = _option(
+        4,
+        "Theory of Figures order: 4, 7 or 10. Higher orders are slower and more accurate.",
+        "numerics",
+    )
     use_simpson: bool = _option(
         True,
         "PyToF uses Simpson's rule (otherwise the trapezoid rule) for internal "
@@ -105,14 +109,28 @@ class Options:
         "flags n of about 0.85 and below. 0 switches the check off.",
         "numerics",
     )
+    simpson_check: bool = _option(
+        True,
+        "If True, PyToF gives up Simpson's rule for the trapezoid rule when "
+        "it produces a non-monotonic enclosed mass or pressure (see "
+        "ToF.simpson_in_use). If False, Simpson's rule stays in use whatever "
+        "happens, which is meant to see where it fails in the debug plots.",
+        "numerics",
+    )
     dJ_tol: float = _option(
-        1e-10, "Relative tolerance of the gravitational moments to quantify convergence.", "numerics"
+        1e-10,
+        "Relative tolerance of the gravitational moments to quantify convergence.",
+        "numerics",
     )
     drot_tol: float = _option(
-        1e-10, "Relative tolerance of the rotational parameter to quantify convergence.", "numerics"
+        1e-10,
+        "Relative tolerance of the rotational parameter to quantify convergence.",
+        "numerics",
     )
     drho_tol: float = _option(
-        1e-10, "Relative tolerance of the densities to quantify convergence.", "numerics"
+        1e-10,
+        "Relative tolerance of the densities to quantify convergence.",
+        "numerics",
     )
     max_iter_relax_shape: int = _option(
         100,
@@ -154,8 +172,21 @@ class Options:
         "renormalization of radius and mass.",
         "output",
     )
-    debug_plot: bool = _option(
-        False, "Save debug plots at every iteration (very slow).", "output"
+    debug_plot: object = _option(
+        False,
+        "Draw one debug figure per iteration of relax_to_barotrope() / "
+        "relax_to_density() and one per iteration of the Theory of Figures "
+        "algorithm (very slow, needs matplotlib). 'show' displays them "
+        "(e.g. in a notebook), 'save' (or True) writes PNG files into the "
+        "current working directory, False draws nothing.",
+        "output",
+    )
+    debug_primed: bool = _option(
+        False,
+        "Which volume integrals the debug figure of the Theory of Figures "
+        "algorithm shows: the unprimed S_2j (False) or the primed S'_2j "
+        "(True).",
+        "output",
     )
     # -------------------------------------------------------------- planet
     G: float = _option(_G, "Gravitational constant in SI units.", "planet")
@@ -328,6 +359,14 @@ class Options:
             raise ValueError(
                 f"surface_exponent_warn must be a number between 0 and 1, "
                 f"not {value!r}."
+            )
+
+    @staticmethod
+    def _validate_debug_plot(value):
+        if value not in (False, True, "show", "save"):
+            raise ValueError(
+                "debug_plot must be False, True, 'show' or 'save', not "
+                f"{value!r}."
             )
 
     @staticmethod

@@ -156,25 +156,16 @@ def _pressurize(tof):
         * tof.A0
     )
 
-    integrand = tof.rhoi * np.gradient(tof.U, tof.li, edge_order=2)
+    tof.Pi = _pressure_profile(tof, tof.simpson_in_use)
 
-    if tof.simpson_in_use:
-        tof.Pi = tof.opts["P0"] - scipy.integrate.cumulative_simpson(
-            integrand, x=tof.li[::-1], initial=0.0
-        )
-    else:
-        tof.Pi = tof.opts["P0"] + scipy.integrate.cumulative_trapezoid(
-            integrand, x=tof.li, initial=0.0
-        )
+    invalid = not (tof.Pi >= 0).all() or not (np.diff(tof.Pi) >= 0).all()
 
-    if tof.opts["debug_plot"]:
-        from PyToF.PlotDebugToF import debug_FunctionsToF_plot
+    if invalid and tof.opts["debug_plot"]:
+        from PyToF.PlotDebugToF import debug_relax_plot
 
-        debug_FunctionsToF_plot(tof, new=False, iteration=tof._debug_iteration)
+        debug_relax_plot(tof, failure=True)
 
-    if tof.simpson_in_use and (
-        not (tof.Pi >= 0).all() or not (np.diff(tof.Pi) >= 0).all()
-    ):
+    if tof.simpson_in_use and tof.opts["simpson_check"] and invalid:
         tof._simpson_failed = True
         warn_simpson_fallback(
             "the calculated pressure contains negative or non-monotonic "
@@ -183,11 +174,33 @@ def _pressurize(tof):
         _pressurize(tof)
 
     assert (tof.Pi >= 0).all(), (
-        "Calculated pressure contains negative entries!"
+        "Calculated pressure contains negative entries! If you switched off "
+        "the option simpson_check, Simpson's rule may have failed."
     )
 
     assert (np.diff(tof.Pi) >= 0).all(), (
-        "Calculated pressure is not monotonically increasing!"
+        "Calculated pressure is not monotonically increasing! If you "
+        "switched off the option simpson_check, Simpson's rule may have "
+        "failed."
+    )
+
+
+def _pressure_profile(tof, use_simpson):
+    """
+    Pressure at the level surfaces from the potential tof.U and the densities
+    tof.rhoi by hydrostatic equilibrium, dP = rho dU, integrated from the
+    surface pressure P0 inwards with Simpson's rule or the trapezoid rule.
+    """
+
+    integrand = tof.rhoi * np.gradient(tof.U, tof.li, edge_order=2)
+
+    if use_simpson:
+        return tof.opts["P0"] - scipy.integrate.cumulative_simpson(
+            integrand, x=tof.li[::-1], initial=0.0
+        )
+
+    return tof.opts["P0"] + scipy.integrate.cumulative_trapezoid(
+        integrand, x=tof.li, initial=0.0
     )
 
 
@@ -747,6 +760,9 @@ def _relax_to_shape(tof, maxiter="default"):
         maxiter=maxiter,
         verbosity=tof.opts["verbosity"],
         debug_plot=tof.opts["debug_plot"],
+        debug_label=getattr(tof, "_debug_label", None) or "relax_to_shape",
+        debug_primed=tof.opts["debug_primed"],
+        simpson_check=tof.opts["simpson_check"],
         R_ref=tof.opts["R_ref"],
         # AlgoToF wants the innermost level surface first:
         ss_initial=[np.flip(s) for s in tof.figure_functions],
@@ -834,7 +850,10 @@ def _relax(self, update_densities, max_iter_name, name):
     tic = time.time()
 
     # Only relevant if debug plots are activated:
+    self._debug_name = name
+    self._debug_history = []
     self._debug_iteration = 0
+    self._debug_label = f"relax_to_{name}, start"
 
     # Call relax_to_shape() and ensure consistency for the first time:
     _relax_to_shape(self, maxiter=2)
@@ -850,12 +869,8 @@ def _relax(self, update_densities, max_iter_name, name):
         IterUpdate = 1
         n_updates = 0
 
-        if self.opts["debug_plot"]:
-            from PyToF.PlotDebugToF import debug_FunctionsToF_plot
-
-            debug_FunctionsToF_plot(
-                self, new=True, iteration=self._debug_iteration
-            )
+        self._debug_iteration = iteration
+        self._debug_label = f"relax_to_{name}, iteration {iteration}"
 
         # Converge on densities (without an atmosphere this loop ends after
         # one iteration for relax_to_density()):
@@ -878,9 +893,6 @@ def _relax(self, update_densities, max_iter_name, name):
 
             # Update iteration parameter:
             IterUpdate += 1
-
-        # Only relevant if debug plots are activated:
-        self._debug_iteration += 1
 
         # Warning if not converged:
         if IterUpdate == self.opts["max_iter_density_update"]:
@@ -906,6 +918,11 @@ def _relax(self, update_densities, max_iter_name, name):
 
         dJs = np.max(np.abs(self.Js[mask] / old_Js[mask] - 1))
         drho = np.max(np.abs(self.rhoi[1:] / old_rho[1:] - 1))
+
+        if self.opts["debug_plot"]:
+            from PyToF.PlotDebugToF import debug_relax_plot
+
+            debug_relax_plot(self, convergence=(drot, dJs, drho))
 
         say(
             self.opts["verbosity"],
@@ -934,6 +951,7 @@ def _relax(self, update_densities, max_iter_name, name):
 
     # Measure ToF performance:
     toc = time.time()
+    self._debug_label = None
 
     # Warning if not converged:
     if iteration == self.opts[max_iter_name]:

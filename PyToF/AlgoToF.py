@@ -30,11 +30,17 @@ def default_opts():
     # algorithm, prevents unreasonable runtimes.
     opts["verbosity"] = 1  # Higher integer numbers lead to more verbosity
     # output in the console. 0 corresponds to no output.
-    opts["debug_plot"] = False  # If True, a debug plot will be shown at each
-    # iteration of the algorithm to visualise the current state of the
-    # calculation, makes the code very slow.
+    opts["debug_plot"] = False  # "show" or "save" (True: "save") draws a
+    # debug figure at each iteration of the algorithm to visualise the current
+    # state of the calculation, makes the code very slow.
     opts["use_simpson"] = True  # If True, Simpson's rule will be used for
     # the integrals, otherwise the trapezoidal rule.
+    opts["simpson_check"] = True  # If True, Simpson's rule is given up for
+    # the trapezoid rule if S_0 becomes non-monotonic. If False, Simpson's rule
+    # stays in use whatever happens (to see the failure in the debug plot).
+    opts["debug_label"] = ""  # Text for the title of the debug plots.
+    opts["debug_primed"] = False  # If True, the debug plots show the primed
+    # volume integrals S'_2j instead of the unprimed S_2j.
     ########################
     # Physical parameters: #
     ########################
@@ -132,6 +138,24 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
 
         # Equations (B.1) and (B.11) from arXiv:1708.06177v1:
         new_Js, R_eq_to_R_m, R_po_to_R_m = B111(ss, SS, R_m_to_R_ref, opts)
+
+        if opts["debug_plot"]:
+            from PyToF.PlotDebugToF import debug_AlgoToF_plot
+
+            debug_AlgoToF_plot(
+                z=z,
+                domain=rho / rho_bar,
+                fs=fs,
+                ss=ss,
+                Js=new_Js,
+                old_Js=Js,
+                order=opts["order"],
+                iteration=it,
+                use_simpson=opts["use_simpson"],
+                mode=opts["debug_plot"],
+                label=opts["debug_label"],
+                primed=opts["debug_primed"],
+            )
 
         # Check for convergence to terminate:
         mask = new_Js != 0
@@ -434,106 +458,24 @@ def B9(fs, z, rho, rho_bar, opts):
                     arrays.
     """
 
-    # Initialize relevant variables:
-    N = len(z) - 1
-    new_SS = []
-
-    # Calculate the dimensionless volume integrals:
-    integrand = z ** (2 * np.arange(opts["order"] + 1) + 3)[:, None]
-    integrand *= np.array(fs[: opts["order"] + 1])
-    integrand_p = z ** (2 - 2 * np.arange(opts["order"] + 1))[:, None]
-    integrand_p *= np.array(fs[(opts["order"] + 1) :])
     domain = rho / rho_bar
 
     if opts["use_simpson"] and not np.allclose(np.diff(z), np.diff(z)[0]):
         opts["use_simpson"] = False
         warn_simpson_fallback("the radius grid is non-uniform.")
 
-    if opts["use_simpson"]:
-        h = z[1] - z[0]
-        integral = scipy.integrate.cumulative_simpson(
-            integrand * np.gradient(domain, z, edge_order=2),
-            dx=h,
-            initial=0,
-            axis=-1,
-        )
-        integral_p = scipy.integrate.cumulative_simpson(
-            (integrand_p * np.gradient(domain, z, edge_order=2)),
-            dx=h,
-            initial=0,
-            axis=-1,
-        )
+    _, _, integral, integral_p = _integrals(
+        fs, z, domain, opts["order"], opts["use_simpson"]
+    )
+    new_SS = _volume_integrals(
+        fs, z, domain, integral, integral_p, opts["order"]
+    )
 
-    else:
-        integral = scipy.integrate.cumulative_trapezoid(
-            integrand, x=domain, initial=0, axis=-1
-        )
-        integral_p = scipy.integrate.cumulative_trapezoid(
-            integrand_p, x=domain, initial=0, axis=-1
-        )
-
-    if opts["debug_plot"]:
-        from PyToF.PlotDebugToF import debug_AlgoToF_plot
-
-        h = z[1] - z[0]
-        integral_simp = scipy.integrate.cumulative_simpson(
-            integrand * np.gradient(domain, z, edge_order=2),
-            dx=h,
-            initial=0,
-            axis=-1,
-        )
-        integral_p_simp = scipy.integrate.cumulative_simpson(
-            (integrand_p * np.gradient(domain, z, edge_order=2)),
-            dx=h,
-            initial=0,
-            axis=-1,
-        )
-
-        integral_trap = scipy.integrate.cumulative_trapezoid(
-            integrand, x=domain, initial=0, axis=-1
-        )
-        integral_p_trap = scipy.integrate.cumulative_trapezoid(
-            integrand_p, x=domain, initial=0, axis=-1
-        )
-
-        debug_AlgoToF_plot(
-            opts["order"],
-            z,
-            domain,
-            fs,
-            integrand,
-            integrand_p,
-            [integral_trap, integral_simp],
-            [integral_p_trap, integral_p_simp],
-            ["trapezoid", "simpson"],
-        )
-
-    for i in range(opts["order"] + 1):
-        assert np.isfinite(z ** -(2 * i + 3)).all(), (
-            "Mean level surfaces array contains values so small that the "
-            "inverse creates overflow errors when taken to some powers. "
-            "Choose a larger minimum mean level surface!"
-        )
-
-        new_SS.append(rho / rho_bar * fs[i] - z ** -(2 * i + 3) * integral[i])
-
-    for i in range(opts["order"] + 1):
-        assert np.isfinite(z ** -(2 - 2 * i)).all(), (
-            "Mean level surfaces array contains values so small that the "
-            "inverse creates overflow errors when taken to some powers. "
-            "Choose a larger minimum mean level surface!"
-        )
-
-        new_SS.append(
-            -domain * fs[opts["order"] + 1 + i]
-            + z ** -(2 - 2 * i)
-            * (
-                domain[N] * (fs[opts["order"] + 1 + i])[N]
-                - (integral_p[i][N] - integral_p[i])
-            )
-        )
-
-    if opts["use_simpson"] and not np.all(np.diff(new_SS[0]) <= 0):
+    if (
+        opts["use_simpson"]
+        and opts["simpson_check"]
+        and not np.all(np.diff(new_SS[0]) <= 0)
+    ):
         opts["use_simpson"] = False
 
         warn_simpson_fallback(
@@ -545,6 +487,78 @@ def B9(fs, z, rho, rho_bar, opts):
         return B9(fs, z, rho, rho_bar, opts)
 
     return new_SS, opts["use_simpson"]
+
+
+def _integrals(fs, z, domain, order, use_simpson):
+    """
+    The integrands and the cumulative integrals I_2j and I'_2j of Eq. (B.9)
+    in arXiv:1708.06177v1 with Simpson's rule or the trapezoid rule. Returns
+    integrand, integrand_p, integral, integral_p, each of shape (order + 1,
+    len(z)).
+    """
+
+    j = np.arange(order + 1)
+    integrand = z ** (2 * j + 3)[:, None]
+    integrand *= np.array(fs[: order + 1])
+    integrand_p = z ** (2 - 2 * j)[:, None]
+    integrand_p *= np.array(fs[(order + 1) :])
+
+    if use_simpson:
+        h = z[1] - z[0]
+        slope = np.gradient(domain, z, edge_order=2)
+        integral = scipy.integrate.cumulative_simpson(
+            integrand * slope, dx=h, initial=0, axis=-1
+        )
+        integral_p = scipy.integrate.cumulative_simpson(
+            integrand_p * slope, dx=h, initial=0, axis=-1
+        )
+
+    else:
+        integral = scipy.integrate.cumulative_trapezoid(
+            integrand, x=domain, initial=0, axis=-1
+        )
+        integral_p = scipy.integrate.cumulative_trapezoid(
+            integrand_p, x=domain, initial=0, axis=-1
+        )
+
+    return integrand, integrand_p, integral, integral_p
+
+
+def _volume_integrals(fs, z, domain, integral, integral_p, order):
+    """
+    The dimensionless volume integrals S_2j followed by the primed ones from
+    the cumulative integrals of _integrals(), Eq. (B.9) in arXiv:1708.06177v1.
+    """
+
+    N = len(z) - 1
+    new_SS = []
+
+    for i in range(order + 1):
+        assert np.isfinite(z ** -(2 * i + 3)).all(), (
+            "Mean level surfaces array contains values so small that the "
+            "inverse creates overflow errors when taken to some powers. "
+            "Choose a larger minimum mean level surface!"
+        )
+
+        new_SS.append(domain * fs[i] - z ** -(2 * i + 3) * integral[i])
+
+    for i in range(order + 1):
+        assert np.isfinite(z ** -(2 - 2 * i)).all(), (
+            "Mean level surfaces array contains values so small that the "
+            "inverse creates overflow errors when taken to some powers. "
+            "Choose a larger minimum mean level surface!"
+        )
+
+        new_SS.append(
+            -domain * fs[order + 1 + i]
+            + z ** -(2 - 2 * i)
+            * (
+                domain[N] * (fs[order + 1 + i])[N]
+                - (integral_p[i][N] - integral_p[i])
+            )
+        )
+
+    return new_SS
 
 
 # Calculate the As (except A0) and all ss based on the fs and the Ss:
