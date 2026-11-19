@@ -14,10 +14,11 @@ from scipy.integrate import trapezoid
 from PyToF import ClassToF
 
 # Literature reference values live in accuracy/references.py, shared with the
-# accuracy notebooks (so notebooks and tests cannot disagree). Wisdom &
+# accuracy notebook (so notebook and tests cannot disagree). Wisdom &
 # Hubbard (2016), Icarus 267, 315, doi:10.1016/j.icarus.2015.12.030:
 # closed-form (Bessel function) solution for a rotating n=1 polytrope with
-# P = rho^2, order of entries: [R_eq/R_m, J2, J4, ..., J20].
+# P = rho^2, order of entries: [R_eq/R_mean, J2, J4, ..., J20]; R_mean is
+# the angular mean radius, R_m * (1 + s0) in PyToF's (volume-equivalent) R_m.
 _spec = importlib.util.spec_from_file_location(
     "pytof_references",
     Path(__file__).resolve().parents[1] / "accuracy" / "references.py",

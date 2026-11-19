@@ -380,11 +380,11 @@ def get_Js_errors(self):
     Fills self.Js_errors with error estimates for the gravitational moments
     Js calculated by the Theory of Figures. They are absolute errors (in the
     units of Js; divide by abs(Js) for the relative errors, which is what the
-    tables store), based on the convergence study in
-    accuracy/accuracy_full.ipynb (tables PyToF/accuracy_data_*.npz). Not
-    called automatically: call it after relax_to_shape(), relax_to_barotrope()
-    or relax_to_density(). Not available with differential rotation or a
-    non-equidistant grid (warns instead).
+    tables store), based on the convergence study of accuracy/accuracy.ipynb
+    (tables PyToF/accuracy_data_*.npz). Not called automatically: call it
+    after relax_to_shape(), relax_to_barotrope() or relax_to_density(). Not
+    available with differential rotation or a non-equidistant grid (warns
+    instead).
 
     The tables belong to the integration rule that is in use: Simpson's rule,
     unless the option use_simpson is False or PyToF fell back to the

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PyToF"
-version = "1.7.0"
+version = "2.0.0"
 description = "Theory of Figures (4th, 7th, 10th order) including barotropic differential rotation"
 readme = "README.md"
 license = { text = "MPL-2.0" }

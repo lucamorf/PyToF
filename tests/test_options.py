@@ -54,7 +54,7 @@ def test_copy_is_independent():
 
 
 def test_options_can_be_pickled():
-    # Needed for multiprocessing in the MCMC.
+    # Needed for multiprocessing (parallel sweeps).
     opts = Options.from_kwargs(N=64, atmosphere=np.sqrt)
     assert pickle.loads(pickle.dumps(opts))["N"] == 64
 

@@ -17,7 +17,7 @@ from tests.cases import (
 
 # Max allowed relative error of J_{2k} (k = 1, 2, ...) per ToF order.
 # Higher harmonics are intentionally absent: a finite-order ToF truncates
-# them (see the accuracy notebook).
+# them (see accuracy/accuracy.ipynb).
 JS_RTOL = {
     4: [2e-5, 1e-3],
     7: [5e-6, 5e-6, 1e-5, 4e-4],
@@ -68,3 +68,14 @@ def test_orders_7_and_10_agree_with_differential_rotation():
     o10 = jupiter_polytrope(10, N=512, alphas=ALPHAS_WH16)
     rel = np.abs(o10.Js[1:3] / o7.Js[1:3] - 1)
     assert np.all(rel < 1e-6), rel
+
+
+def test_mean_radius_definition_explains_the_bessel_radius_ratio():
+    # PyToF's R_m (X.R_eq_to_R_m) is the volume-equivalent radius; Wisdom &
+    # Hubbard (2016, Eqs. 3-5) use R with no P_0 term in the shape function,
+    # i.e. the angular mean radius R_m * (1 + s0). The 3.9e-4 gap to their
+    # Table 3 value is exactly s0.
+    X = jupiter_polytrope(7, N=1024)
+    s0 = X.figure_functions[0][0]
+    assert abs(X.R_eq_to_R_m / WH16_BESSEL[0] - 1) > 3e-4
+    assert abs(X.R_eq_to_R_m / (1 + s0) / WH16_BESSEL[0] - 1) < 5e-6

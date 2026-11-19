@@ -87,14 +87,16 @@ class Options:
     )
     order: int = _option(
         4,
-        "Theory of Figures order: 4, 7 or 10. Higher orders are slower and more accurate.",
+        "Theory of Figures order: 4, 7 or 10. Higher orders are slower and "
+        "more accurate.",
         "numerics",
     )
     use_simpson: bool = _option(
         True,
-        "PyToF uses Simpson's rule (otherwise the trapezoid rule) for internal "
-        "integral calculations if True. PyToF falls back to the trapezoid rule on "
-        "its own if Simpson's rule becomes unstable, see ToF.simpson_in_use.",
+        "PyToF uses Simpson's rule (otherwise the trapezoid rule) for "
+        "internal integral calculations if True. PyToF falls back to the "
+        "trapezoid rule on its own if Simpson's rule becomes unstable, see "
+        "ToF.simpson_in_use.",
         "numerics",
     )
     surface_exponent_warn: float = _option(
@@ -119,12 +121,14 @@ class Options:
     )
     dJ_tol: float = _option(
         1e-10,
-        "Relative tolerance of the gravitational moments to quantify convergence.",
+        "Relative tolerance of the gravitational moments to quantify "
+        "convergence.",
         "numerics",
     )
     drot_tol: float = _option(
         1e-10,
-        "Relative tolerance of the rotational parameter to quantify convergence.",
+        "Relative tolerance of the rotational parameter to quantify "
+        "convergence.",
         "numerics",
     )
     drho_tol: float = _option(

@@ -101,10 +101,10 @@ class ToF:
                             point mass has +GM/r, and dP = rho dU
         - A0:               Array, important to determine the total potential
                             introduced in Eq. (B.3) in arXiv:1708.06177v1
-        - R_eq_to_R_m:      Float, ratio of the equatorial radius to the to
-                            outermost mean surface layer
-        - R_po_to_R_m:      Float, ratio of the polar radius to the to
-                            outermost mean surface layer
+        - R_eq_to_R_m:      Float, ratio of the equatorial radius to the
+                            mean radius li[0] of the outermost level surface
+        - R_po_to_R_m:      Float, ratio of the polar radius to the mean
+                            radius li[0] of the outermost level surface
         - simpson_in_use:   True again if use_simpson is True (see above)
         - atmosphere_index: Integer, defines the index of atmosphere transition
         """

@@ -1,9 +1,9 @@
 """
-Reference solutions used by the accuracy notebooks and the test suite.
+Reference solutions used by the accuracy notebook and the test suite.
 
 Every number in this file comes from the literature (or is derived, as said
 in the comment) and nothing is fitted to PyToF. The tests import from here
-(``tests/cases.py``), so the notebooks and the tests cannot disagree.
+(``tests/cases.py``), so the accuracy notebook and the tests cannot disagree.
 """
 
 import numpy as np
@@ -31,7 +31,12 @@ JUNO_J2 = (14696.5063e-6, 0.0006e-6)
 #
 # Rotating n=1 polytrope (P = rho^2), solid-body rotation, m = 0.089195487
 # (the Jupiter value used in the paper), closed-form (Bessel function)
-# solution. Entries: [R_eq/R_m, J2, J4, ..., J20].
+# solution. Entries: [R_eq/R, J2, J4, ..., J20] (Table 3, column Bessel).
+# NOTE: R here is the *angular mean* radius of the surface, the radius of
+# r = R s [1 + eta(s, mu)] with the shape function eta = sum_{l>0} a_l P_l(mu), no P_0
+# term (Eqs. 3-5 of the paper; R_eq = R [1 + eta(1, 0)]). PyToF's R_m is the
+# volume-equivalent radius, R = R_m (1 + s0) with s0 = X.figure_functions[0][0]
+# (-3.9e-4 for this polytrope), so R_eq/R = X.R_eq_to_R_m / (1 + s0).
 Bessel = np.array(
     [
         1.022875431133174e0,
@@ -50,7 +55,7 @@ Bessel = np.array(
 
 # Same paper: the Concentric Maclaurin Spheroid method (CMS) with barotropic
 # differential rotation, two different wind profiles (DR2: A2..A8 below,
-# DR3: A2..A20 below). R_eq/R_m is not given (nan).
+# DR3: A2..A20 below). R_eq/R is not given (nan).
 CMSDR2 = np.array(
     [
         np.nan,
