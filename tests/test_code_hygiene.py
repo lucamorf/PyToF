@@ -1,9 +1,11 @@
-"""Static checks on the generated, hand-assembled polynomial code."""
+"""Static checks on the code and on generated repo files."""
 
 import ast
 from pathlib import Path
 
 import pytest
+
+from tests.make_readme import README, updated
 
 PACKAGE = Path(__file__).resolve().parents[1] / "PyToF"
 
@@ -29,3 +31,12 @@ def test_no_discarded_expressions(module):
         if isinstance(node, ast.Expr) and not isinstance(node.value, harmless)
     ]
     assert not bare, f"discarded expressions in {module}: {bare}"
+
+
+def test_readme_options_table_is_up_to_date():
+    """The options table in the README is generated, not written by hand."""
+    text = README.read_text()
+    assert updated(text) == text, (
+        "The options table in README.md is out of date; run "
+        "`python -m tests.make_readme`."
+    )
