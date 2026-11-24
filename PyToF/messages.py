@@ -45,7 +45,10 @@ import warnings
 __all__ = [
     "AccuracyWarning",
     "ConvergenceWarning",
+    "PressureError",
+    "PyToFError",
     "PyToFWarning",
+    "RenormalisationError",
     "RenamedWarning",
     "paint",
     "say",
@@ -62,6 +65,25 @@ _KINDS = {
     "warn": "\033[91m",
     "good": "\033[92m",
 }
+
+
+class PyToFError(RuntimeError):
+    """Base class of the errors raised by PyToF at run time."""
+
+
+class PressureError(PyToFError):
+    """
+    The hydrostatic pressure profile is unphysical (negative or not
+    increasing inwards), e.g. because Simpson's rule failed with
+    ``simpson_check=False``.
+    """
+
+
+class RenormalisationError(PyToFError):
+    """
+    Rescaling the level surfaces or the densities did not reproduce the
+    physical radius or mass that was asked for.
+    """
 
 
 class PyToFWarning(UserWarning):

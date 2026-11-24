@@ -3,6 +3,20 @@
 Single file replacing the former `overhaul/` folder (31 notes and diffs, still in
 git history before the commit that removed them). Newest first.
 
+## Unreleased (after 2.0.0; version number still to be chosen)
+
+### Changes
+- **`assert` statements replaced by exceptions** (they vanish under `python -O` and gave poor messages). New in `PyToF.messages`: `PyToFError` (base), `PressureError` (negative or non-monotonic pressure, e.g. Simpson's rule failing with `simpson_check=False`; was an `AssertionError`) and `RenormalisationError` (rescaling to the physical radius or mass failed). Invalid input to `Algorithm` raises `ValueError` (shape mismatch, negative `m_rot`), `NotImplementedError` (vector `n_bin`) or `FloatingPointError` (radii too small); an equatorial or polar radius on the wrong side of the mean radius raises `ArithmeticError`. Code that caught `AssertionError` must catch `PressureError` instead. The shape check of `Algorithm` previously ran after the arrays had been indexed with each other, so a mismatch ended in an `IndexError`.
+- `get_Kn(n, bs=None, rtol=None, atol=None)`: tolerances of the ODE solver; `None` keeps the SciPy defaults (1e-3, 1e-6), so nothing changes unless they are given.
+- `ToF.history`: a `ConvergenceHistory` (`PyToF/history.py`) with the Js, `drot`, `dJs`, `drho` after every iteration of the last `relax_to_barotrope()` / `relax_to_density()`, and whether it converged. `None` before the first call and after `reset()`.
+- README: the options table is generated from `Options.describe()` (`python -m tests.make_readme`, checked by `tests/test_readme.py`). `describe()` no longer turns "i.e." and "e.g." into code.
+- Tests: surface-slope detector against the surface pressure P0 (warns up to 1e6 Pa at N = 1024; the blind spot above ~1e7 Pa is pinned down as a known limitation), `get_Kn` tolerances, history, errors.
+
+### Findings (n = 0.8 polytrope, no code change yet)
+- **Reference solution.** No tabulated rotating n = 0.8 polytrope exists in the literature found (Hachisu 1986 / Wisdom & Hubbard cover other n). An independent reference follows from the non-rotating Lane-Emden equation (NMoI exact; reproduces 0.261382 for n = 1) and Radau's equation for slow rotation, J2 / q = (3 - eta_s) / (3 (2 + eta_s)): for n = 0.8, NMoI = 0.2862056 and J2 / q = 0.2167323 (eta_s = 1.02994) in the limit q -> 0. PyToF at q = 1.3e-7, order 4, relative error of J2 / q against it: trapezoid -1.1e-3, -5.4e-4, -2.7e-4, -1.4e-4, -6.9e-5 for N = 512 ... 8192 (first order in 1/N, converging to the reference); Simpson +1.8e-3 (N = 512) and +1.2e-3 (1024) where it is still active, and identical to the trapezoid rule from N = 2048 on (fallback). So the trapezoid rule is the more accurate one for a surface slope that is infinite, and both converge to the right value.
+- **The 4096 failure.** On a Simpson failure `_pressurize` switches to the trapezoid rule but keeps the potential `U` computed from the `A0` of the Simpson shape calculation, which is polluted near the surface; the trapezoid pressure is then non-monotonic at one grid point (index 4) and `PressureError` is raised. Calling `_relax_to_shape(tof, maxiter=2)` before the second `_pressurize` fixes it in a prototype (N = 2048, 4096, 8192 converge in 58, 35, 27 iterations to the trapezoid result). Not applied: it changes numbers whenever a fallback happens in `_pressurize`.
+- **Surface-slope detector against P0** (n = 0.8, estimate of the exponent in iteration 3): N = 256: 0.859, 0.864, 0.873, 0.894 for P0 = 0, 1e5, 1e6, 1e7 Pa, 0.93 for 1e8; N = 1024: 0.859, 0.874, 0.896, 0.931 (1e7, no warning but the iteration limit is hit, so only a `ConvergenceWarning` appears).
+
 ## 2.0.0 (overhaul of 2026)
 
 ### Breaking changes
@@ -47,11 +61,9 @@ git history before the commit that removed them). Newest first.
 `accuracy/accuracy.ipynb` with `MODE = "quick"` (~10 s): analytical checks, Bessel sweep N = 2^5..2^12, DR2 against CMS, comparison with the shipped tables. `MODE = "full"` (default, ~4 min): all N = 2^3..2^15, all binnings, Simpson and trapezoid, DR2/DR3, Movshovitz & Fortney (2022); `WRITE_TABLES = True` overwrites `PyToF/accuracy_data_*.npz` (used by `ToF.get_Js_errors()`). All runs are in one process pool, most expensive first, one BLAS thread per worker, each run computed once. The recomputed tables agree with the shipped ones bit for bit (deviation 0.0), so the numerics of the accuracy tables are unchanged by the rewrite.
 
 ### Open
-- `PlotDebugToF`: a convergence-history object (Js per iteration) without plotting; return figures instead of showing/saving.
-- Simpson vs trapezoid differ for n = 0.8 (J2 by 0.17 %), which is closer is undetermined. `n = 0.8, N = 4096` with Simpson ends in `AssertionError: Calculated pressure is not monotonically increasing!` after the fallback (N = 2048 converges); the fallback should not end in an assertion.
-- Surface-slope detector independent of P0 (P0 >~ 1e6 Pa hides the singularity from the three outermost points) is untested.
-- `get_Kn`: optional `rtol`/`atol`.
-- README: options table generated from `Options.describe()`.
+- `PlotDebugToF`: return figures instead of showing/saving (the convergence history is `ToF.history`).
+- Simpson vs trapezoid differ for n = 0.8 (J2 by 0.17 %), which is closer is undetermined. `n = 0.8, N = 4096` with Simpson ends in `AssertionError: Calculated pressure is not monotonically increasing!` after the fallback (N = 2048 converges); the fallback should not end in an error (see the unreleased findings for the prototype fix).
+- Surface-slope detector independent of P0 (see the measurements above; the blind spot above ~1e7 Pa is only documented by a test).
 - Ideas: move the `FunctionsToF.py` functions into the class (or mixins); give `AlgoToF.default_opts()` a real signature; require explicit planet parameters instead of the W&H Jupiter defaults in a future major version; generate the `A0 +=` prefixes in `Mathematica/convert.py`.
 
 ## Earlier versions

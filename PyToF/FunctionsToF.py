@@ -9,10 +9,13 @@ import numpy as np
 import scipy
 
 import PyToF.AlgoToF as AlgoToF
+from PyToF.history import ConvergenceHistory
 from PyToF.messages import (
     AccuracyWarning,
     ConvergenceWarning,
+    PressureError,
     PyToFWarning,
+    RenormalisationError,
     say,
     warn,
     warn_simpson_fallback,
@@ -63,10 +66,11 @@ def _fixradius(tof):
             "'mean', 'polar'"
         )
 
-    assert np.isclose(tof.R_calc, tof.opts["R_phys"][0]), (
-        "Renormalizing the level surfaces for consistency with the initially "
-        "provided physical radius failed!"
-    )
+    if not np.isclose(tof.R_calc, tof.opts["R_phys"][0]):
+        raise RenormalisationError(
+            "Renormalizing the level surfaces for consistency with the "
+            "initially provided physical radius failed!"
+        )
 
 
 def _fixmass(tof):
@@ -80,10 +84,11 @@ def _fixmass(tof):
     tof.rhoi = tof.rhoi * tof.opts["M_phys"] / _mass_int(tof)
 
     # Sanity check:
-    assert np.isclose(_mass_int(tof), tof.opts["M_phys"]), (
-        "Renormalizing the densities for consistency with the initially "
-        "provided mass failed!"
-    )
+    if not np.isclose(_mass_int(tof), tof.opts["M_phys"]):
+        raise RenormalisationError(
+            "Renormalizing the densities for consistency with the initially "
+            "provided mass failed!"
+        )
 
 
 def _fixrot(tof):
@@ -173,16 +178,18 @@ def _pressurize(tof):
         )
         _pressurize(tof)
 
-    assert (tof.Pi >= 0).all(), (
-        "Calculated pressure contains negative entries! If you switched off "
-        "the option simpson_check, Simpson's rule may have failed."
-    )
+    if not (tof.Pi >= 0).all():
+        raise PressureError(
+            "Calculated pressure contains negative entries! If you switched "
+            "off the option simpson_check, Simpson's rule may have failed."
+        )
 
-    assert (np.diff(tof.Pi) >= 0).all(), (
-        "Calculated pressure is not monotonically increasing! If you "
-        "switched off the option simpson_check, Simpson's rule may have "
-        "failed."
-    )
+    if not (np.diff(tof.Pi) >= 0).all():
+        raise PressureError(
+            "Calculated pressure is not monotonically increasing! If you "
+            "switched off the option simpson_check, Simpson's rule may have "
+            "failed."
+        )
 
 
 def _pressure_profile(tof, use_simpson):
@@ -535,7 +542,7 @@ def get_NMoI(self, N=1000):
     return NMoI
 
 
-def get_Kn(self, n, bs=None):
+def get_Kn(self, n, bs=None, rtol=None, atol=None):
     """
     This function returns arrays r, T_n and K_n. K_n(r) is the Love function
     of n-th degree based on solving a differential equation for T_n(r).
@@ -544,6 +551,11 @@ def get_Kn(self, n, bs=None):
     bs: An array that contains the radii of all density discontinuities
         inside the planet. A discontinuity at the surface (a nonzero density
         at the outermost level surface) is taken into account automatically.
+    rtol, atol: Relative and absolute tolerance of the ODE solver
+        scipy.integrate.solve_ivp. None (default) keeps the SciPy defaults
+        (1e-3 and 1e-6), which are loose: tighten them, e.g. rtol=1e-8,
+        atol=1e-10, if the grid (N), not the ODE solver, should limit the
+        accuracy.
 
     A density jump is not integrated over as a steep gradient: the grid cells
     around each radius in bs are removed from the density derivative, which
@@ -558,7 +570,11 @@ def get_Kn(self, n, bs=None):
     # Get smallest and largest radius:
     r0 = self.li[-1]
     R = self.li[0]
-    assert r0 < R
+    if not r0 < R:
+        raise ValueError(
+            "The level surfaces must be ordered from the outside (li[0]) "
+            "inwards, but li[-1] is not smaller than li[0]."
+        )
 
     # Define array with all radii where boundary conditions apply:
     if bs is None:
@@ -596,6 +612,13 @@ def get_Kn(self, n, bs=None):
         self.li[::-1], -np.gradient(self.U, self.li)[::-1]
     )
 
+    # Tolerances only if given, so that None means the SciPy defaults:
+    tolerances = {
+        key: value
+        for key, value in (("rtol", rtol), ("atol", atol))
+        if value is not None
+    }
+
     # Define right-hand side of the differential equation:
     # (1D, 2nd order) -> (2D, 1st order)
     def rhs(t, y):
@@ -614,6 +637,7 @@ def get_Kn(self, n, bs=None):
         (bs[0], bs[1]),
         y0,
         max_step=(R - r0) / self.opts["N"],
+        **tolerances,
     )
 
     # Store solutions:
@@ -646,6 +670,7 @@ def get_Kn(self, n, bs=None):
             (bs[i], bs[i + 1]),
             y0,
             max_step=(R - r0) / self.opts["N"],
+            **tolerances,
         )
 
         # Store solutions:
@@ -854,6 +879,7 @@ def _relax(self, update_densities, max_iter_name, name):
     self._debug_history = []
     self._debug_iteration = 0
     self._debug_label = f"relax_to_{name}, start"
+    self.history = history = ConvergenceHistory(name)
 
     # Call relax_to_shape() and ensure consistency for the first time:
     _relax_to_shape(self, maxiter=2)
@@ -924,6 +950,8 @@ def _relax(self, update_densities, max_iter_name, name):
 
             debug_relax_plot(self, convergence=(drot, dJs, drho))
 
+        history.record(self.Js, drot, dJs, drho)
+
         say(
             self.opts["verbosity"],
             3,
@@ -944,6 +972,7 @@ def _relax(self, update_densities, max_iter_name, name):
             and dJs < self.opts["dJ_tol"]
             and drho < self.opts["drho_tol"]
         ):
+            history.converged = True
             break
 
         # Update iteration parameter:
@@ -952,6 +981,7 @@ def _relax(self, update_densities, max_iter_name, name):
     # Measure ToF performance:
     toc = time.time()
     self._debug_label = None
+    history.simpson_failed = self._simpson_failed
 
     # Warning if not converged:
     if iteration == self.opts[max_iter_name]:

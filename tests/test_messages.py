@@ -230,6 +230,32 @@ def test_surface_slope_warns_with_realistic_surface_pressure():
         X.relax_to_barotrope()
 
 
+@pytest.mark.parametrize("P0", [1e5, 1e6])
+@pytest.mark.filterwarnings("ignore::PyToF.messages.ConvergenceWarning")
+def test_surface_slope_warns_up_to_a_surface_pressure_of_1e6_pa(P0):
+    # The estimate rises with P0 (0.86, 0.87, 0.90 for 0, 1e5, 1e6 Pa at
+    # N = 1024) but stays below the default limit 0.9 for small P0.
+    X = _polytrope(0.8, P0=P0, N=1024)
+    with pytest.warns(AccuracyWarning, match="surface_exponent_warn"):
+        X.relax_to_barotrope()
+
+
+def test_surface_slope_detector_is_blind_for_a_large_surface_pressure():
+    # Known limitation: for P0 >~ 1e7 Pa the three outermost points no longer
+    # show the singularity (estimate 0.93 > 0.9), so there is no
+    # AccuracyWarning about the surface although Simpson's rule still hits
+    # the iteration limit. The user is then only told about the missing
+    # convergence. If the detector ever becomes independent of P0, this test
+    # fails and should be replaced by a test that it warns.
+    X = _polytrope(0.8, P0=1e7, N=1024)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        X.relax_to_barotrope()
+    messages = [str(w.message) for w in caught]
+    assert not any("surface_exponent_warn" in m for m in messages)
+    assert any(issubclass(w.category, ConvergenceWarning) for w in caught)
+
+
 @pytest.mark.parametrize("n", [1.0, 1.5])
 def test_surface_slope_silent_for_finite_slope(n):
     X = _polytrope(n)

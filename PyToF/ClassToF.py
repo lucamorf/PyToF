@@ -106,6 +106,9 @@ class ToF:
         - R_po_to_R_m:      Float, ratio of the polar radius to the mean
                             radius li[0] of the outermost level surface
         - simpson_in_use:   True again if use_simpson is True (see above)
+        - history:          None again; relax_to_barotrope() and
+                            relax_to_density() store a ConvergenceHistory
+                            (Js, drot, dJs, drho after every iteration) here
         - atmosphere_index: Integer, defines the index of atmosphere transition
         """
 
@@ -124,6 +127,7 @@ class ToF:
             )
         )
         self._simpson_failed = False
+        self.history = None
         self.Pi = np.zeros(self.opts["N"])
         self.Js = np.hstack((-1, np.zeros(self.opts["order"])))
         self.Js_errors = np.hstack(

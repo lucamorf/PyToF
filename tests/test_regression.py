@@ -62,3 +62,20 @@ def test_reset_undoes_simpson_fallback():
     fresh = jupiter_polytrope(4, 256)
     assert X.simpson_in_use
     np.testing.assert_allclose(X.Js, fresh.Js, rtol=1e-12)
+
+
+def test_invalid_input_raises_errors_not_assertions():
+    import numpy as np
+
+    from PyToF.AlgoToF import Algorithm
+    from PyToF.messages import PyToFError, RenormalisationError
+
+    with pytest.raises(ValueError, match="m_rot is negative"):
+        Algorithm(np.linspace(0.1, 1, 8), np.ones(8), -1.0)
+    with pytest.raises(ValueError, match="same shape"):
+        Algorithm(np.linspace(0.1, 1, 8), np.ones(7), 0.1)
+    with pytest.raises(NotImplementedError, match="n_bin"):
+        Algorithm(np.linspace(0.1, 1, 8), np.ones(8), 0.1, n_bin=[1, 2])
+
+    # The run-time errors share one base class:
+    assert issubclass(RenormalisationError, PyToFError)

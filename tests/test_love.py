@@ -79,3 +79,16 @@ def test_polytrope_without_surface_density_is_unchanged():
     X = jupiter_polytrope(4, N=1024, Period=np.inf)
     assert X.rhoi[0] == 0
     assert X.get_Kn(2)[2][-1] == pytest.approx(15 / np.pi**2 - 1, rel=1e-4)
+
+
+def test_tolerances_default_to_scipy_and_can_be_tightened():
+    X = jupiter_polytrope(4, N=1024, Period=np.inf)
+    default = X.get_Kn(2)
+    explicit = X.get_Kn(2, rtol=1e-3, atol=1e-6)  # the SciPy defaults
+    for a, b in zip(default, explicit, strict=True):
+        np.testing.assert_array_equal(a, b)
+
+    tight = X.get_Kn(2, rtol=1e-10, atol=1e-12)
+    exact = 15 / np.pi**2 - 1
+    assert len(tight[0]) > len(default[0])  # more solver steps
+    assert abs(tight[2][-1] / exact - 1) < 1e-4

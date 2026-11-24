@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from PyToF import ClassToF
+from PyToF.messages import PressureError
 from tests.cases import R_JUPITER, jupiter_polytrope
 
 pytest.importorskip("matplotlib")
@@ -59,7 +60,7 @@ def test_debug_plot_option_is_validated():
 def test_simpson_check_off_keeps_simpson_and_plots_the_failure(
     tmp_path, monkeypatch
 ):
-    """Without the check a density jump ends in the pressure assertion, after
+    """Without the check a density jump ends in a PressureError, after
     a figure was drawn."""
     monkeypatch.chdir(tmp_path)
     X = ClassToF.ToF(
@@ -70,7 +71,7 @@ def test_simpson_check_off_keeps_simpson_and_plots_the_failure(
         max_iter_relax_barotrope=3,
     )
     X.set_barotrope(_jump)
-    with pytest.raises(AssertionError, match="simpson_check"):
+    with pytest.raises(PressureError, match="simpson_check"):
         X.relax_to_barotrope()
     assert X.simpson_in_use
     assert list(tmp_path.glob("debug_relax_barotrope_*.png"))

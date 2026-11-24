@@ -426,7 +426,10 @@ class Options:
             # Show identifiers (names with an underscore or a dot, calls like
             # relax_to_shape()) as code so that Markdown cannot misread them.
             text = re.sub(
-                r"\b\w+(?:[._]\w+)+(?:\(\))?|\b\w+\(\)", r"`\g<0>`", text
+                r"(?<![\w.])(?!(?:i\.e|e\.g)\b)\w+(?:[._]\w+)+(?:\(\))?"
+                r"|\b\w+\(\)",
+                r"`\g<0>`",
+                text,
             )
             return cell(text)
 

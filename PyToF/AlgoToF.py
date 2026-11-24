@@ -7,6 +7,12 @@ import scipy
 
 from PyToF.messages import warn_simpson_fallback
 
+_TOO_SMALL = (
+    "Mean level surfaces array contains values so small that the inverse "
+    "creates overflow errors when taken to some powers. Choose a larger "
+    "minimum mean level surface!"
+)
+
 
 def default_opts():
     """
@@ -81,6 +87,8 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
     # Minimal input control:
     mean_l = np.array(mean_l)
     rho = np.array(rho)
+    if mean_l.shape != rho.shape:
+        raise ValueError("mean_l and rho do not have the same shape!")
 
     # Inside -> outside radii to ensure consistency with B9() implementation:
     p = np.argsort(mean_l)
@@ -90,13 +98,11 @@ def Algorithm(mean_l, rho, m_rot, **kwargs):
     # Smallest numerically resolvable non-zero number:
     mean_l[mean_l == 0] = np.spacing(np.min(mean_l[mean_l != 0]))
 
-    assert mean_l.shape == rho.shape, (
-        "mean_l and rho do not have the same shape!"
-    )
-    assert m_rot >= 0, "m_rot is negative!"
-    assert np.isscalar(opts["n_bin"]), (
-        "Vector n_bin feature not yet implemented!"
-    )  # Idea: provide non-equidistant points
+    if not m_rot >= 0:
+        raise ValueError("m_rot is negative!")
+    if not np.isscalar(opts["n_bin"]):
+        # Idea: provide non-equidistant points
+        raise NotImplementedError("Vector n_bin feature not yet implemented!")
 
     # Define and initialize local variables:
     N = len(mean_l)
@@ -534,20 +540,14 @@ def _volume_integrals(fs, z, domain, integral, integral_p, order):
     new_SS = []
 
     for i in range(order + 1):
-        assert np.isfinite(z ** -(2 * i + 3)).all(), (
-            "Mean level surfaces array contains values so small that the "
-            "inverse creates overflow errors when taken to some powers. "
-            "Choose a larger minimum mean level surface!"
-        )
+        if not np.isfinite(z ** -(2 * i + 3)).all():
+            raise FloatingPointError(_TOO_SMALL)
 
         new_SS.append(domain * fs[i] - z ** -(2 * i + 3) * integral[i])
 
     for i in range(order + 1):
-        assert np.isfinite(z ** -(2 - 2 * i)).all(), (
-            "Mean level surfaces array contains values so small that the "
-            "inverse creates overflow errors when taken to some powers. "
-            "Choose a larger minimum mean level surface!"
-        )
+        if not np.isfinite(z ** -(2 - 2 * i)).all():
+            raise FloatingPointError(_TOO_SMALL)
 
         new_SS.append(
             -domain * fs[order + 1 + i]
@@ -1057,12 +1057,14 @@ def B111(ss, SS, R_m_to_R_ref, opts):
     # fmt: on
 
     # Sanity check:
-    assert R_eq_to_R_m >= 1.0, (
-        "Equatorial radius is smaller than mean outer level surface!"
-    )
-    assert R_po_to_R_m <= 1.0, (
-        "Polar radius is bigger than mean outer level surface!"
-    )
+    if not R_eq_to_R_m >= 1.0:
+        raise ArithmeticError(
+            "Equatorial radius is smaller than mean outer level surface!"
+        )
+    if not R_po_to_R_m <= 1.0:
+        raise ArithmeticError(
+            "Polar radius is bigger than mean outer level surface!"
+        )
 
     # Intialize gravitational moment storage:
     Js = []
