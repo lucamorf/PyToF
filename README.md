@@ -126,6 +126,22 @@ Error as a function of N and the binning N / n_bin; binning by a modest factor c
 
 ![work_precision](accuracy/images/work_precision.png)
 
+## Testing
+
+Install the test dependencies (`pip install .[test]`) and run, from the repository root:
+
+```
+PYTHONPATH=$PWD pytest
+```
+
+`PYTHONPATH` makes sure that this source tree and not an installed PyToF is tested. The run takes about 30 s and prints at its top which optional tests are switched on. The notebook tests (the five tutorials and the quick accuracy notebook, a few minutes, need `nbformat` and `nbclient`) are skipped unless you ask for them:
+
+```
+PYTOF_TEST_NOTEBOOKS=1 PYTHONPATH=$PWD pytest
+```
+
+A single file or test: `pytest tests/test_love.py`, `pytest -k golden`. The golden files of the regression tests are rewritten with `python -m tests.make_golden` (only after a deliberate change of the numerics), the options table of this README with `python -m tests.make_readme`.
+
 ## Changelog
 
-See [`CHANGELOG.md`](CHANGELOG.md) (2.0.0: MCMC and `PlotToF` removed, renamed options with `RenamedWarning`, new tutorials and tests).
+See [`CHANGELOG.md`](CHANGELOG.md) (2.1.0: `ToF.history`, `get_Kn` tolerances, exceptions instead of asserts; 2.0.0: MCMC and `PlotToF` removed, renamed options with `RenamedWarning`, new tutorials and tests).

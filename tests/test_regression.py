@@ -27,6 +27,7 @@ def test_golden_file_covers_all_cases():
 
 
 @pytest.mark.parametrize("name", sorted(GOLDEN_CASES))
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_matches_golden(name):
     got = summarize(GOLDEN_CASES[name]())
     for key, expected in GOLDEN[name].items():
@@ -39,6 +40,7 @@ def test_matches_golden(name):
         )
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_reset_undoes_simpson_fallback():
     """A density jump makes PyToF fall back to the trapezoid rule; reset()
     must undo that so that the next model does not depend on the last one."""

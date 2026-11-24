@@ -119,6 +119,7 @@ def test_relaxing_does_not_change_options():
     assert after == before  # in particular n_bin stays -1
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_simpson_fallback_is_state_not_an_option():
     N = 128
     X = ClassToF.ToF(

@@ -27,6 +27,7 @@ def test_matplotlib_not_imported_without_debug_plot():
 
 
 @pytest.mark.parametrize("debug_plot", [True, "save"])
+@pytest.mark.filterwarnings("ignore::PyToF.messages.ConvergenceWarning")
 def test_debug_plot_saves_one_large_figure_per_iteration(
     tmp_path, monkeypatch, debug_plot
 ):
@@ -41,6 +42,7 @@ def test_debug_plot_saves_one_large_figure_per_iteration(
     assert sum(n.startswith("debug_AlgoToF_") for n in names) >= 4
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.ConvergenceWarning")
 def test_debug_plot_show_displays_and_writes_nothing(tmp_path, monkeypatch):
     import matplotlib.pyplot as plt
 
@@ -87,6 +89,7 @@ def test_simpson_check_on_is_the_default_and_falls_back():
 
 
 @pytest.mark.parametrize("primed", [False, True])
+@pytest.mark.filterwarnings("ignore::PyToF.messages.ConvergenceWarning")
 def test_debug_primed_selects_the_volume_integrals(
     tmp_path, monkeypatch, primed
 ):

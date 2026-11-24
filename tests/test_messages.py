@@ -121,6 +121,7 @@ def test_messages_by_verbosity(capsys, verbosity, expected):
         assert "Iteration" not in out and "Renormalized" not in out
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_relax_to_shape_summary(capsys):
     X = uniform_sphere(N=128, period=24 * 3600, verbosity=0)
     X.opts["verbosity"] = 2
@@ -149,6 +150,7 @@ def test_non_equidistant_grid_warns_in_get_NMoI():
         X.get_NMoI()
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_atmosphere_transition_is_reported(capsys):
     X = ClassToF.ToF(
         N=128,
@@ -181,6 +183,7 @@ def test_density_jump_warns_about_the_trapezoid_fallback():
         uniform_sphere(N=128, period=24 * 3600)
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_shape_not_converging_warns():
     with pytest.warns(ConvergenceWarning, match="dJ_tol"):
         uniform_sphere(N=128, period=24 * 3600, max_iter_relax_shape=1)
@@ -196,6 +199,7 @@ def test_barotrope_not_converging_warns_and_names_the_limit():
     assert record[0].filename == __file__  # points at the user's line
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_inconsistent_radius_warns():
     # The sphere helper fixes the *mean* radius; declaring it equatorial
     # contradicts the flattening of a rotating body.
@@ -224,6 +228,7 @@ def test_surface_slope_warns_for_polytrope_below_one():
         X.relax_to_barotrope()
 
 
+@pytest.mark.filterwarnings("ignore::PyToF.messages.ConvergenceWarning")
 def test_surface_slope_warns_with_realistic_surface_pressure():
     X = _polytrope(0.8, P0=1e5, N=1024)
     with pytest.warns(AccuracyWarning, match="surface_exponent_warn"):

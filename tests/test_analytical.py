@@ -49,6 +49,7 @@ def test_rotation_flattens_the_planet():
 
 
 @pytest.mark.parametrize("order", [4, 7, 10])
+@pytest.mark.filterwarnings("ignore::PyToF.messages.AccuracyWarning")
 def test_J2_of_uniform_spheroid_is_positive_and_J4_negative(order):
     X = uniform_sphere(N=256, period=24 * 3600, order=order)
     assert X.Js[1] > 0 > X.Js[2]

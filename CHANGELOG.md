@@ -3,14 +3,16 @@
 Single file replacing the former `overhaul/` folder (31 notes and diffs, still in
 git history before the commit that removed them). Newest first.
 
-## Unreleased (after 2.0.0; version number still to be chosen)
+## 2.1.0 (2026-11-24)
+
+Minor release: new API (`ToF.history`, `get_Kn` tolerances, exception classes), numerics unchanged. One breaking detail: code that caught `AssertionError` from a failed pressure integration must catch `PressureError`.
 
 ### Changes
 - **`assert` statements replaced by exceptions** (they vanish under `python -O` and gave poor messages). New in `PyToF.messages`: `PyToFError` (base), `PressureError` (negative or non-monotonic pressure, e.g. Simpson's rule failing with `simpson_check=False`; was an `AssertionError`) and `RenormalisationError` (rescaling to the physical radius or mass failed). Invalid input to `Algorithm` raises `ValueError` (shape mismatch, negative `m_rot`), `NotImplementedError` (vector `n_bin`) or `FloatingPointError` (radii too small); an equatorial or polar radius on the wrong side of the mean radius raises `ArithmeticError`. Code that caught `AssertionError` must catch `PressureError` instead. The shape check of `Algorithm` previously ran after the arrays had been indexed with each other, so a mismatch ended in an `IndexError`.
 - `get_Kn(n, bs=None, rtol=None, atol=None)`: tolerances of the ODE solver; `None` keeps the SciPy defaults (1e-3, 1e-6), so nothing changes unless they are given.
 - `ToF.history`: a `ConvergenceHistory` (`PyToF/history.py`) with the Js, `drot`, `dJs`, `drho` after every iteration of the last `relax_to_barotrope()` / `relax_to_density()`, and whether it converged. `None` before the first call and after `reset()`.
-- README: the options table is generated from `Options.describe()` (`python -m tests.make_readme`, checked by `tests/test_readme.py`). `describe()` no longer turns "i.e." and "e.g." into code.
-- Tests: surface-slope detector against the surface pressure P0 (warns up to 1e6 Pa at N = 1024; the blind spot above ~1e7 Pa is pinned down as a known limitation), `get_Kn` tolerances, history, errors.
+- README: the options table is generated from `Options.describe()` (`python -m tests.make_readme`, checked by `tests/test_code_hygiene.py`). `describe()` no longer turns "i.e." and "e.g." into code.
+- Tests: warnings that a test provokes on purpose are filtered per test, the run header and the README ("Testing") say how to include the notebook tests (`PYTOF_TEST_NOTEBOOKS=1`); surface-slope detector against the surface pressure P0 (warns up to 1e6 Pa at N = 1024; the blind spot above ~1e7 Pa is pinned down as a known limitation), `get_Kn` tolerances, history, errors.
 
 ### Findings (n = 0.8 polytrope, no code change yet)
 - **Reference solution.** No tabulated rotating n = 0.8 polytrope exists in the literature found (Hachisu 1986 / Wisdom & Hubbard cover other n). An independent reference follows from the non-rotating Lane-Emden equation (NMoI exact; reproduces 0.261382 for n = 1) and Radau's equation for slow rotation, J2 / q = (3 - eta_s) / (3 (2 + eta_s)): for n = 0.8, NMoI = 0.2862056 and J2 / q = 0.2167323 (eta_s = 1.02994) in the limit q -> 0. PyToF at q = 1.3e-7, order 4, relative error of J2 / q against it: trapezoid -1.1e-3, -5.4e-4, -2.7e-4, -1.4e-4, -6.9e-5 for N = 512 ... 8192 (first order in 1/N, converging to the reference); Simpson +1.8e-3 (N = 512) and +1.2e-3 (1024) where it is still active, and identical to the trapezoid rule from N = 2048 on (fallback). So the trapezoid rule is the more accurate one for a surface slope that is infinite, and both converge to the right value.
